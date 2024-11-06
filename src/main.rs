@@ -1,23 +1,13 @@
-use procfs::process::all_processes;
+mod ctrl_proc;
+pub use ctrl_proc::kill_process;
+pub use ctrl_proc::terminate_process;
+pub use ctrl_proc::killall;
+pub use ctrl_proc::suspend_process;
+pub use ctrl_proc::resume_process;
 
 fn main() {
-    match all_processes() {
-        Ok(processes) => {
-            for process in processes {
-                if let Ok(proc) = process {
-                    // Get the process ID and command
-                    let pid = proc.pid;
-                    let command = proc.stat().unwrap().comm;
-                    let pageSize: f64 = procfs::page_size().unwrap() as f64;
-                    let memory: f64 = proc.stat().unwrap().rss as f64 * pageSize / 1024.0 / 1024.0;
-                    // let name = proc.stat().comm;
-
-                    println!("PID: {}, Name: {}, Command: {}, Memory: {}", pid, name, command, memory);
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!("Failed to get processes: {}", e);
-        }
+    match terminate_process(1760746) {
+        Ok(_) => println!("Process killed successfully."),
+        Err(err) => eprintln!("{}", err),
     }
 }
