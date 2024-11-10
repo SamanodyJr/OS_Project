@@ -7,7 +7,7 @@ pub fn kill_process(pid: i32) -> Result<(), String> {
     send_signal(pid, Signal::SIGKILL)
 }
 
-pub fn terminate_process(pid: i32) -> Result<(), String> {
+pub fn terminate_process(pid: i32) -> Result<(), String> {~
     send_signal(pid, Signal::SIGTERM)
 }
 
