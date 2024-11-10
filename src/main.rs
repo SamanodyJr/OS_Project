@@ -1,4 +1,4 @@
-mod Memory; // Declare the memory module
+mod Memory;
 fn main() 
 {
     loop 
