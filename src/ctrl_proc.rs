@@ -1,13 +1,17 @@
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
-use nix::sys::resource::{setpriority, Which};
+use nix::libc::setpriority;
+//use nix::sys::resource::{setpriority, Which};
+
+
+
 use procfs::process::all_processes;
 
 pub fn kill_process(pid: i32) -> Result<(), String> {
     send_signal(pid, Signal::SIGKILL)
 }
 
-pub fn terminate_process(pid: i32) -> Result<(), String> {~
+pub fn terminate_process(pid: i32) -> Result<(), String> {
     send_signal(pid, Signal::SIGTERM)
 }
 
@@ -59,7 +63,7 @@ pub fn change_priority(pid: i32, priority: i32) -> Result<(), String> {
     }
 
     let pid = Pid::from_raw(pid);
-    match setpriority(Which::Pid(pid), priority) {
+    match setpriority(which::Pid(pid), priority, priority) {
         Ok(_) => Ok(()),
         Err(err) => Err(format!("Failed to set priority for process {}: {}", pid, err)),
     }
