@@ -1,8 +1,7 @@
 mod Memory;
+mod IO;
 fn main() 
 {
-    loop 
-    {
         Memory::Mem_Usage();
-    }
+        let _ = IO::Disk_Usage();
 }
