@@ -8,3 +8,4 @@ procfs = "0.14.0"
 nix = { version = "0.29", features = ["aio", "process", "signal", "resource"] }
 sysinfo = "0.32.0"
 which = "7.0.0"
+scheduler = "0.1.3"

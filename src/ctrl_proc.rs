@@ -1,11 +1,9 @@
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
-use nix::libc::setpriority;
-//use nix::sys::resource::{setpriority, Which};
-
-
-
+use scheduler::Which::Process;
 use procfs::process::all_processes;
+use scheduler::set_priority;
+
 
 pub fn kill_process(pid: i32) -> Result<(), String> {
     send_signal(pid, Signal::SIGKILL)
@@ -62,9 +60,8 @@ pub fn change_priority(pid: i32, priority: i32) -> Result<(), String> {
         return Err(format!("Invalid priority value: {}. Priority must be between -20 and 19.", priority));
     }
 
-    let pid = Pid::from_raw(pid);
-    match setpriority(which::Pid(pid), priority, priority) {
+    match set_priority(Process,pid, priority) {
         Ok(_) => Ok(()),
-        Err(err) => Err(format!("Failed to set priority for process {}: {}", pid, err)),
+        Err(err) => Err(format!("Failed to set priority to process {}: {:?}", pid, err)),
     }
 }
