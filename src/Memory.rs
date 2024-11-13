@@ -9,20 +9,16 @@ pub fn Mem_Usage()
 
     loop 
     {
-        // Refresh memory usage data
         sys.refresh_memory();
 
-        // Get total and used memory in bytes
         let total_memory = sys.total_memory() as f64;
         let used_memory = sys.used_memory() as f64;
         let free_memory = sys.free_memory() as f64;
 
-        // Get total and used swap memory in bytes
         let total_swap = sys.total_swap() as f64;
         let used_swap = sys.used_swap() as f64;
         let free_swap = sys.free_swap() as f64;
 
-        // Display memory and swap usage
         println!("Memory Usage:");
 
         println!("  Used: {} %", (used_memory/total_memory)*100.0);
