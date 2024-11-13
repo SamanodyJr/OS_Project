@@ -1,8 +1,10 @@
 use nix::sys::signal::{kill, Signal};
-use nix::unistd::Pid;
-use scheduler::Which::Process;
+use nix::unistd::{Pid};
+//use scheduler::Which::Process;
+use std::process::Command;
+use std::process::Stdio;
 use procfs::process::all_processes;
-use scheduler::set_priority;
+//use scheduler::set_priority;
 
 
 pub fn kill_process(pid: i32) -> Result<(), String> {
@@ -53,15 +55,19 @@ pub fn killall(process_name: &str) -> Result<(), String> {
         Err(errors.join(", "))
     }
 }
-
-pub fn change_priority(pid: i32, priority: i32) -> Result<(), String> {
-    
+pub fn change_priority(pid: i32, priority: i32) -> bool {
     if priority < -20 || priority > 19 {
-        return Err(format!("Invalid priority value: {}. Priority must be between -20 and 19.", priority));
+        return false;
     }
 
-    match set_priority(Process,pid, priority) {
-        Ok(_) => Ok(()),
-        Err(err) => Err(format!("Failed to set priority to process {}: {:?}", pid, err)),
-    }
+    let output;
+    output = Command::new("sudo")
+        .arg("renice")
+        .arg(format!("{}", priority))
+        .arg(format!("{}", pid))
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("Failed to change priority");         
+    output.status.success()
 }
