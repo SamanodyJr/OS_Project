@@ -5,5 +5,8 @@ edition = "2021"
 
 [dependencies]
 procfs = "0.14.0"
-sysinfo = "0.32.0"
-
+sysinfo = "0.27.4"
+simple-process-stats = "1.0.0"
+tokio = { version = "1", features = ["full"] }
+users = "0.11" 
+lpfs = "0.2.0"
