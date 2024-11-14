@@ -7,7 +7,8 @@ struct ProcessInfo {
     command: String,
     user: String,
     v_memory: f64, 
-    rss_memory: f64, 
+    rss_memory: f64,
+    shared_memory: f64, 
     memory_uasge: f64,
     cpu_usage: f64,
     time: String,
@@ -52,7 +53,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
                         let page_size: f64 = procfs::page_size().unwrap() as f64;
                         let v_memory: f64 = stat.vsize as f64 / (1024.0 * 1024.0);
                         let rss_memory: f64 = (stat.rss as f64 * page_size) / (1024.0 * 1024.0);
-                        
+                        let shared_memory: f64 = (proc.statm().unwrap().shared as f64 * page_size) / (1024.0 * 1024.0);
                         // let disk_read: f64 = proc.io().unwrap().read_bytes as f64 / (1024.0 * 1024.0);
                         // let disk_write: f64 = proc.io().unwrap().write_bytes as f64 / (1024.0 * 1024.0);
                         
@@ -85,6 +86,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
                             user,
                             v_memory, 
                             rss_memory, 
+                            shared_memory,
                             memory_uasge,
                             cpu_usage,
                             time,
@@ -113,12 +115,13 @@ pub fn print_process() {
     for process in processes_info {
 
     println!(
-        "PID: {} | User: {} | Command: {} | Virtual Memory: {:.2} MB | RSS Memory: {:.2} MB | Memory Usage: {:.2}% | CPU Usage: {:.2}% | Time: {} | Priority: {} | Nice: {} | Parent PID: {} | State: {} | Threads: {}",
+        "PID: {} | User: {} | Command: {} | Virtual Memory: {:.2} MB | RSS Memory: {:.2} MB | Shared Memory: {:.2} MB | Memory Usage: {:.2}% | CPU Usage: {:.2}% | Time: {} | Priority: {} | Nice: {} | Parent PID: {} | State: {} | Threads: {}",
         process.pid,
         process.user,
         process.command,
         process.v_memory,
         process.rss_memory,
+        process.shared_memory,
         process.memory_uasge,
         process.cpu_usage,
         process.time,
