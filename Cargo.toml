@@ -11,5 +11,6 @@ nix = "0.29.0"
 ratatui = "0.29.0"
 time = "0.3.36"
 crossterm = "0.28.1"
-
-
+user = "0.1.1"
+color-eyre = "0.6"
+strum = "0.26"
