@@ -6,5 +6,10 @@ edition = "2021"
 [dependencies]
 procfs = "0.17.0"
 sysinfo = "0.32.0"
+libc = "0.2.164"
+nix = "0.29.0"
+ratatui = "0.29.0"
+time = "0.3.36"
+crossterm = "0.28.1"
 
 
