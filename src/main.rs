@@ -4,22 +4,37 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{palette::tailwind, Color, Style, Styled, Stylize},
+    style::{palette::tailwind, Color, Style, Styled, Stylize, Modifier},
     symbols,
     text::Line,
     widgets::{block::Title, Block, Borders, Cell, Gauge, Padding, Paragraph, Row, Table, Tabs, Widget},
     DefaultTerminal,
 };
+use std::{sync::{Arc, Mutex}, time::Duration};
+use std::thread::sleep;
+
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use color_eyre::Result;
 mod overview;
 pub use overview::print_process;
 pub use overview::get_processes;
-use tokio::time::{self, Duration};
+use tokio::time;
 
 mod cpuUsage;
 pub use cpuUsage::CpuUsage;
 pub use cpuUsage::cpu_result;
+mod Memory;
+use Memory::MemoryUsage;
+use Memory::Mem_Usage;
+
+mod IO;
+use IO::DiskUsage;
+use IO::Disk_Usage;
+
+
+
+
+
 
 const gaugeBarColor: Color = tailwind::RED.c800;
 const gaugeTextColor: Color = tailwind::GREEN.c600;
@@ -35,6 +50,10 @@ fn calculate_gauge_color(percent: u16) -> Color {
 }
 
 
+
+
+
+
 fn main() -> Result<()> {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
     let app_result:std::result::Result<(), color_eyre::eyre::Error>= App::default().run(terminal);
@@ -48,6 +67,7 @@ fn main() -> Result<()> {
 struct App {
     state: AppState,
     selected_tab: SelectedTab,
+    processes: Vec<Process>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -66,8 +86,6 @@ enum SelectedTab {
     Tab2,
     #[strum(to_string = "Memory")]
     Tab3,
-    #[strum(to_string = "I/O")]
-    Tab4,
 }
 
 impl App {
@@ -78,6 +96,8 @@ impl App {
         }
         Ok(())
     }
+
+    
 
     fn handle_events(&mut self) -> std::io::Result<()> {
         if let Event::Key(key) = event::read()? {
@@ -169,7 +189,7 @@ impl Widget for SelectedTab {
             Self::Tab1 => self.render_tab0(area, buf),
             Self::Tab2 => self.render_tab1(area, buf),
             Self::Tab3 => self.render_tab2(area, buf),
-            Self::Tab4 => self.render_tab3(area, buf),
+
         }
     }
 }
@@ -294,17 +314,131 @@ impl SelectedTab {
         }
     }
 
+
+
+
     fn render_tab2(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("Look! I'm different than others!")
-            .block(self.block())
-            .render(area, buf);
+        let memory = Mem_Usage();
+        let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
+        let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
+        let gauge = Gauge::default()
+            .block(Block::default().title("Memory Usage").borders(Borders::ALL))
+            .gauge_style(gauge_color)
+            .percent(((memory.used / memory.total) * 100.0) as u16)
+            .label(format!("{:.1}%", (memory.used / memory.total) * 100.0))
+            .set_style(Style::default().fg(gaugeTextColor));
+        let swap_gauge = Gauge::default()
+            .block(Block::default().title("Swap Usage").borders(Borders::ALL))
+            .gauge_style(gauge_color_swap)
+            .percent(((memory.used_swap / memory.total_swap) * 100.0) as u16)
+            .label(format!("{:.1}%", (memory.used_swap / memory.total_swap) * 100.0))
+            .set_style(Style::default().fg(gaugeTextColor));
+        let rows = vec![
+            Row::new(vec![
+                Cell::from("Total Memory"),
+                Cell::from(format!("{:.2} GB", memory.total)),
+            ]),
+            Row::new(vec![
+                Cell::from("Used Memory"),
+                Cell::from(format!("{:.2} GB", memory.used)),
+            ]),
+            Row::new(vec![
+                Cell::from("Free Memory").style(Style::default().add_modifier(Modifier::BOLD)),
+                Cell::from(format!("{:.2} GB", memory.free)),
+            ])];
+            let row_swap = vec![
+            Row::new(vec![
+                Cell::from("Total Swap"),
+                Cell::from(format!("{:.2} MB", memory.total_swap)),
+            ]),
+            Row::new(vec![
+                Cell::from("Used Swap"),
+                Cell::from(format!("{:.2} MB", memory.used_swap)),
+            ]),
+            Row::new(vec![
+                Cell::from("Free Swap"),
+                Cell::from(format!("{:.2} MB", memory.free_swap)),
+            ]),
+        ];
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(area);
+        let table = Table::new(rows, [Constraint::Length(20), Constraint::Length(20)])
+            .block(Block::default().borders(Borders::ALL).title("Memory"))
+            .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+        let table_swap = Table::new(row_swap, [Constraint::Length(20), Constraint::Length(20)])
+            .block(Block::default().borders(Borders::ALL).title("Swap"))
+            .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+        let left_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+            .split(columns[0]);
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+            .split(columns[1]);
+        gauge.render(left_chunks[0], buf);
+        swap_gauge.render(right_chunks[0], buf);
+        table.render(left_chunks[1], buf);
+        table_swap.render(right_chunks[1], buf);
+
+        let disk_usage = Disk_Usage();
+        let disk_rows = vec![
+            Row::new(vec![
+                Cell::from("Device Name"),
+                Cell::from(disk_usage.device_name.clone()),
+            ]),
+            Row::new(vec![
+                Cell::from("Reads Completed"),
+                Cell::from(disk_usage.reads_completed.to_string()),
+            ]),
+            Row::new(vec![
+                Cell::from("Time Reading"),
+                Cell::from(disk_usage.time_reading.to_string()),
+            ]),
+            Row::new(vec![
+                Cell::from("Writes Completed"),
+                Cell::from(disk_usage.writes_completed.to_string()),
+            ]),
+            Row::new(vec![
+                Cell::from("Time Writing"),
+                Cell::from(disk_usage.time_writing.to_string()),
+            ]),
+            Row::new(vec![
+                Cell::from("I/O in Progress"),
+                Cell::from(disk_usage.io_in_progress.to_string()),
+            ]),
+            Row::new(vec![
+                Cell::from("Time I/O"),
+                Cell::from(disk_usage.time_io.to_string()),
+            ]),
+        ];
+        let disk_table1 = Table::new(
+            disk_rows.iter().take(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+            [Constraint::Length(20), Constraint::Length(20)],
+        )
+        .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 1"))
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+        let disk_table2 = Table::new(
+            disk_rows.iter().skip(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+            [Constraint::Length(20), Constraint::Length(20)],
+        )
+        .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 2"))
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+        disk_table1.render(left_chunks[2], buf);
+        disk_table2.render(right_chunks[2], buf);
+        
+
     }
 
-    fn render_tab3(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("I know, these are some basic changes. But I think you got the main idea.")
-            .block(self.block())
-            .render(area, buf);
-    }
+
+
+    
+
+
 
     /// A block surrounding the tab's content
     fn block(self) -> Block<'static> {
@@ -319,7 +453,6 @@ impl SelectedTab {
             Self::Tab1 => tailwind::BLUE,
             Self::Tab2 => tailwind::EMERALD,
             Self::Tab3 => tailwind::INDIGO,
-            Self::Tab4 => tailwind::RED,
         }
     }
 }

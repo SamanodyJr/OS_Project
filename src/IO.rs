@@ -3,11 +3,23 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use std::{thread, time::Duration};
 
-pub fn Disk_Usage() -> io::Result<()> 
+pub struct DiskUsage {
+    pub device_name: String,
+    pub reads_completed: u64,
+    pub time_reading: u64,
+    pub writes_completed: u64,
+    pub time_writing: u64,
+    pub io_in_progress: u64,
+    pub time_io: u64,
+}
+
+
+
+
+pub fn Disk_Usage() -> DiskUsage 
 {
-    let root_disk = get_root_disk()?;
+    let root_disk = get_root_disk().unwrap();
     let root_disk_without_partition = strip_partition_suffix(&root_disk);
 
     let root_disk_name = root_disk_without_partition.strip_prefix("/dev/").unwrap_or(&root_disk_without_partition);
@@ -15,14 +27,22 @@ pub fn Disk_Usage() -> io::Result<()>
     let file_path = "/proc/diskstats";
     let path = Path::new(file_path);
 
-    loop 
-    {
-        let file = File::open(path)?;
+    
+        let file = File::open(path).unwrap();
         let reader = io::BufReader::new(file);
+        let mut disk_usage = DiskUsage {
+            device_name: root_disk_name.to_string(),
+            reads_completed: 0,
+            time_reading: 0,
+            writes_completed: 0,
+            time_writing: 0,
+            io_in_progress: 0,
+            time_io: 0,
+        };
 
         for line in reader.lines() 
         {
-            let line = line?;
+            let line = line.unwrap();
             let fields: Vec<&str> = line.split_whitespace().collect();
 
             if fields.len() >= 14 
@@ -38,20 +58,28 @@ pub fn Disk_Usage() -> io::Result<()>
                     let io_in_progress = fields[11];
                     let time_io = fields[12];
 
-                    println!("Disk Stats for root device: {}", device_name);
-                    println!("------------------------------------");
-                    println!("  Reads Completed: {}", reads_completed);
-                    println!("  Time Reading (ms): {}", time_reading);
-                    println!("  Writes Completed: {}", writes_completed);
-                    println!("  Time Writing (ms): {}", time_writing);
-                    println!("  IO In Progress: {}", io_in_progress);
-                    println!("  Time IO (ms): {}", time_io);
-                    println!();
+                        disk_usage.device_name = device_name.to_string();
+                        disk_usage.reads_completed = reads_completed.parse().unwrap();
+                        disk_usage.time_reading = time_reading.parse().unwrap();
+                        disk_usage.writes_completed = writes_completed.parse().unwrap();
+                        disk_usage.time_writing = time_writing.parse().unwrap();
+                        disk_usage.io_in_progress = io_in_progress.parse().unwrap();
+                        disk_usage.time_io = time_io.parse().unwrap();
+                    break;
+
+                    // println!("Disk Stats for root device: {}", device_name);
+                    // println!("------------------------------------");
+                    // println!("  Reads Completed: {}", reads_completed);
+                    // println!("  Time Reading (ms): {}", time_reading);
+                    // println!("  Writes Completed: {}", writes_completed);
+                    // println!("  Time Writing (ms): {}", time_writing);
+                    // println!("  IO In Progress: {}", io_in_progress);
+                    // println!("  Time IO (ms): {}", time_io);
+                    // println!();
                 }
             }
         }
-        thread::sleep(Duration::from_secs(5));
-    }
+        disk_usage
 }
 
 fn get_root_disk() -> io::Result<String> 
@@ -67,7 +95,7 @@ fn get_root_disk() -> io::Result<String>
         if fields.len() >= 2 && fields[1] == "/" 
         {
             let root_disk = fields[0].to_string();
-            println!("Found root disk: {}", root_disk);
+            // println!("Found root disk: {}", root_disk);
             return Ok(root_disk);
         }
     }

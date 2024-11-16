@@ -111,6 +111,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
         return processes_info;
 }
 
+#[derive(Clone)]
 pub struct Process {
     pub pid: u32,
     pub user: String,
@@ -127,6 +128,8 @@ pub struct Process {
     pub state: String,
     pub threads: i64,
 }
+
+
 
 impl From<&ProcessInfo> for Process {
     fn from(info: &ProcessInfo) -> Self {
