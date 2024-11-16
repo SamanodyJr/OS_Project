@@ -329,14 +329,124 @@ fn render_cpu(area: Rect, buf: &mut Buffer) {
             gauge.render(right_column_chunks[i], buf);
         }
     }
-}
+
 
 fn render_memory(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("Memory stats will be displayed here!")
+    let memory = Mem_Usage();
+    let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
+    let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
+    let gauge = Gauge::default()
+        .block(Block::default().title("Memory Usage").borders(Borders::ALL))
+        .gauge_style(gauge_color)
+        .percent(((memory.used / memory.total) * 100.0) as u16)
+        .label(format!("{:.1}%", (memory.used / memory.total) * 100.0))
+        .set_style(Style::default().fg(gaugeTextColor));
+    let swap_gauge = Gauge::default()
+        .block(Block::default().title("Swap Usage").borders(Borders::ALL))
+        .gauge_style(gauge_color_swap)
+        .percent(((memory.used_swap / memory.total_swap) * 100.0) as u16)
+        .label(format!("{:.1}%", (memory.used_swap / memory.total_swap) * 100.0))
+        .set_style(Style::default().fg(gaugeTextColor));
+    let rows = vec![
+        Row::new(vec![
+            Cell::from("Total Memory"),
+            Cell::from(format!("{:.2} GB", memory.total)),
+        ]),
+        Row::new(vec![
+            Cell::from("Used Memory"),
+            Cell::from(format!("{:.2} GB", memory.used)),
+        ]),
+        Row::new(vec![
+            Cell::from("Free Memory").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from(format!("{:.2} GB", memory.free)),
+        ])];
+        let row_swap = vec![
+        Row::new(vec![
+            Cell::from("Total Swap"),
+            Cell::from(format!("{:.2} MB", memory.total_swap)),
+        ]),
+        Row::new(vec![
+            Cell::from("Used Swap"),
+            Cell::from(format!("{:.2} MB", memory.used_swap)),
+        ]),
+        Row::new(vec![
+            Cell::from("Free Swap"),
+            Cell::from(format!("{:.2} MB", memory.free_swap)),
+        ]),
+    ];
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(area);
+    let table = Table::new(rows, [Constraint::Length(20), Constraint::Length(20)])
         .block(Block::default().borders(Borders::ALL).title("Memory"))
-        .render(area, buf);
-}
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+    let table_swap = Table::new(row_swap, [Constraint::Length(20), Constraint::Length(20)])
+        .block(Block::default().borders(Borders::ALL).title("Swap"))
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+        .split(columns[0]);
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+        .split(columns[1]);
+    gauge.render(left_chunks[0], buf);
+    swap_gauge.render(right_chunks[0], buf);
+    table.render(left_chunks[1], buf);
+    table_swap.render(right_chunks[1], buf);
 
+    let disk_usage = Disk_Usage();
+    let disk_rows = vec![
+        Row::new(vec![
+            Cell::from("Device Name"),
+            Cell::from(disk_usage.device_name.clone()),
+        ]),
+        Row::new(vec![
+            Cell::from("Reads Completed"),
+            Cell::from(disk_usage.reads_completed.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time Reading"),
+            Cell::from(disk_usage.time_reading.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Writes Completed"),
+            Cell::from(disk_usage.writes_completed.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time Writing"),
+            Cell::from(disk_usage.time_writing.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("I/O in Progress"),
+            Cell::from(disk_usage.io_in_progress.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time I/O"),
+            Cell::from(disk_usage.time_io.to_string()),
+        ]),
+    ];
+    let disk_table1 = Table::new(
+        disk_rows.iter().take(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+        [Constraint::Length(20), Constraint::Length(20)],
+    )
+    .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 1"))
+    .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+    let disk_table2 = Table::new(
+        disk_rows.iter().skip(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+        [Constraint::Length(20), Constraint::Length(20)],
+    )
+    .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 2"))
+    .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+    disk_table1.render(left_chunks[2], buf);
+    disk_table2.render(right_chunks[2], buf);
+    
+
+}
 fn render_io(area: Rect, buf: &mut Buffer) {
     Paragraph::new("I/O stats will be displayed here!")
         .block(Block::default().borders(Borders::ALL).title("I/O"))
