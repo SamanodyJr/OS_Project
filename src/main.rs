@@ -284,9 +284,51 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
 
 
 fn render_cpu(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("CPU stats will be displayed here!")
-        .block(Block::default().borders(Borders::ALL).title("CPU"))
-        .render(area, buf);
+    let cpu_usages: Vec<CpuUsage> = cpu_result();
+        
+        let gauges: Vec<Gauge> = cpu_usages.iter().map(|cpu_usage| {
+            let percent_value = cpu_usage.cpu_usage as u16;
+            let label = format!("{:.1}%", cpu_usage.cpu_usage);
+            let gauge_color = calculate_gauge_color(percent_value);
+
+            Gauge::default()
+                .block(Block::default().title(format!("CPU {} Usage", cpu_usage.core_number)).borders(Borders::ALL))
+                .gauge_style(gauge_color)
+                .percent(percent_value as u16)
+                .label(label)
+                .set_style(Style::default().fg(gaugeTextColor))
+        }).collect();
+
+        // Split the area into two columns
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(area);
+
+        // Split each column into rows for the gauges
+        let left_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+        let right_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+
+        let left_column_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(left_column_constraints)
+            .split(columns[0]);
+
+        let right_column_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(right_column_constraints)
+            .split(columns[1]);
+
+        // Render the gauges in the left column
+        for (i, gauge) in gauges.iter().take(gauges.len() / 2).enumerate() {
+            gauge.render(left_column_chunks[i], buf);
+        }
+
+        // Render the gauges in the right column
+        for (i, gauge) in gauges.iter().skip(gauges.len() / 2).enumerate() {
+            gauge.render(right_column_chunks[i], buf);
+        }
+    }
 }
 
 fn render_memory(area: Rect, buf: &mut Buffer) {
