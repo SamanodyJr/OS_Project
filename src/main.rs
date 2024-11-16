@@ -3,11 +3,11 @@ use overview::Process;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
-    style::{palette::tailwind, Color, Stylize},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{palette::tailwind, Color, Style, Styled, Stylize},
     symbols,
     text::Line,
-    widgets::{Block, Borders, Cell, Row, Table, Padding, Paragraph, Tabs, Widget},
+    widgets::{block::Title, Block, Borders, Cell, Gauge, Padding, Paragraph, Row, Table, Tabs, Widget},
     DefaultTerminal,
 };
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
@@ -16,15 +16,30 @@ mod overview;
 pub use overview::print_process;
 pub use overview::get_processes;
 use tokio::time::{self, Duration};
+
 mod cpuUsage;
-pub use cpuUsage::calculate_cpu_usage;
+pub use cpuUsage::CpuUsage;
+pub use cpuUsage::cpu_result;
+
+const gaugeBarColor: Color = tailwind::RED.c800;
+const gaugeTextColor: Color = tailwind::GREEN.c600;
+
+fn calculate_gauge_color(percent: u16) -> Color {
+    match percent {
+        0..=20 => tailwind::GREEN.c300,
+        21..=40 => tailwind::ORANGE.c500,
+        41..=60 => tailwind::ORANGE.c800,
+        61..=80 => tailwind::RED.c800,
+        _ => tailwind::RED.c900,
+    }
+}
 
 
-fn main() {
+fn main() -> Result<()> {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
     let app_result:std::result::Result<(), color_eyre::eyre::Error>= App::default().run(terminal);
     ratatui::restore();
-    app_result.unwrap();
+    app_result
     
 }
 
@@ -231,10 +246,52 @@ impl SelectedTab {
         table.render(area, buf);
     }
 
+    
     fn render_tab1(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("Welcome to the Ratatui tabs example!")
-            .block(self.block())
-            .render(area, buf);
+        let cpu_usages: Vec<CpuUsage> = cpu_result();
+        
+        let gauges: Vec<Gauge> = cpu_usages.iter().map(|cpu_usage| {
+            let percent_value = cpu_usage.cpu_usage as u16;
+            let label = format!("{:.1}%", cpu_usage.cpu_usage);
+            let gauge_color = calculate_gauge_color(percent_value);
+
+            Gauge::default()
+                .block(Block::default().title(format!("CPU {} Usage", cpu_usage.core_number)).borders(Borders::ALL))
+                .gauge_style(gauge_color)
+                .percent(percent_value as u16)
+                .label(label)
+                .set_style(Style::default().fg(gaugeTextColor))
+        }).collect();
+
+        // Split the area into two columns
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(area);
+
+        // Split each column into rows for the gauges
+        let left_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+        let right_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+
+        let left_column_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(left_column_constraints)
+            .split(columns[0]);
+
+        let right_column_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(right_column_constraints)
+            .split(columns[1]);
+
+        // Render the gauges in the left column
+        for (i, gauge) in gauges.iter().take(gauges.len() / 2).enumerate() {
+            gauge.render(left_column_chunks[i], buf);
+        }
+
+        // Render the gauges in the right column
+        for (i, gauge) in gauges.iter().skip(gauges.len() / 2).enumerate() {
+            gauge.render(right_column_chunks[i], buf);
+        }
     }
 
     fn render_tab2(self, area: Rect, buf: &mut Buffer) {

@@ -43,3 +43,24 @@ pub fn calculate_cpu_usage(prev: &[u64], curr: &[u64]) -> f64 {
 
     100.0 * (total_diff - idle_diff) as f64 / total_diff as f64
 }
+
+pub struct CpuUsage {
+    pub cpu_usage: f64,
+    pub core_number: i32,
+}
+
+pub fn cpu_result() -> Vec<CpuUsage> {
+    let mut cpu_usages = Vec::new();
+    let mut prev_cpu_stats = read_cpu_stat().unwrap();
+    sleep(Duration::from_secs(1));
+    let curr_cpu_stats = read_cpu_stat().unwrap();
+
+    for (i, (prev, curr)) in prev_cpu_stats.iter().zip(curr_cpu_stats.iter()).enumerate().skip(1) {
+        let cpu_usage = calculate_cpu_usage(prev, curr);
+        cpu_usages.push(CpuUsage {
+            cpu_usage,
+            core_number: i as i32 - 1, // Adjust core number to start from 0 for the first core
+        });
+    }
+    cpu_usages
+}
