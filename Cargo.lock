@@ -602,6 +602,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "pin-utils",
 ]
 
 [[package]]
@@ -683,6 +684,12 @@ name = "pin-project-lite"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "915a1e146535de9163f3987b8944ed8cf49a18bb0056bcebcdcece385cece4ff"
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "powerfmt"

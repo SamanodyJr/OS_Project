@@ -110,7 +110,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
     }
         return processes_info;
 }
-
+#[derive(Clone)]
 pub struct Process {
     pub pid: u32,
     pub user: String,
