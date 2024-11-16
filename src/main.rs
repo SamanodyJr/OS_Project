@@ -16,6 +16,9 @@ mod overview;
 pub use overview::print_process;
 pub use overview::get_processes;
 use tokio::time::{self, Duration};
+mod cpuUsage;
+pub use cpuUsage::calculate_cpu_usage;
+
 
 fn main() {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
