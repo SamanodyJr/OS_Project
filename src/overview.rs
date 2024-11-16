@@ -1,8 +1,10 @@
 use procfs::process::all_processes;
 use procfs::{ticks_per_second,Uptime};
 use sysinfo::{System, SystemExt};
-use users::{get_user_by_uid};
-struct ProcessInfo {
+use users::get_user_by_uid;
+use std::fmt::Write;
+
+pub struct ProcessInfo {
     pid: u32,
     command: String,
     user: String,
@@ -109,29 +111,73 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
         return processes_info;
 }
 
-pub fn print_process() {
+pub struct Process {
+    pub pid: u32,
+    pub user: String,
+    pub command: String,
+    pub v_memory: f64,
+    pub rss_memory: f64,
+    pub shared_memory: f64,
+    pub memory_uasge: f64,
+    pub cpu_usage: f64,
+    pub time: String,
+    pub priority: i64,
+    pub nice: i64,
+    pub ppid: i32,
+    pub state: String,
+    pub threads: i64,
+}
+
+impl From<&ProcessInfo> for Process {
+    fn from(info: &ProcessInfo) -> Self {
+        Process {
+            pid: info.pid,
+            user: info.user.clone(),
+            command: info.command.clone(),
+            v_memory: info.v_memory,
+            rss_memory: info.rss_memory,
+            shared_memory: info.shared_memory,
+            memory_uasge: info.memory_uasge,
+            cpu_usage: info.cpu_usage,
+            time: info.time.clone(),
+            priority: info.priority,
+            nice: info.nice,
+            ppid: info.ppid,
+            state: info.state.clone(),
+            threads: info.threads,
+        }
+    }
+}
+
+pub fn get_processes() -> Vec<Process> {
     let processes_info = get_processes_info();
+    processes_info.iter().map(Process::from).collect()
+}
+
+pub fn print_process() -> String {
+    let processes_info = get_processes_info();
+    let mut output = String::new();
 
     for process in processes_info {
+        let _ = write!(
+            output,
+            "PID: {} | User: {} | Command: {} | Virtual Memory: {:.2} MB | RSS Memory: {:.2} MB | Shared Memory: {:.2} MB | Memory Usage: {:.2}% | CPU Usage: {:.2}% | Time: {} | Priority: {} | Nice: {} | Parent PID: {} | State: {} | Threads: {}\n",
+            process.pid,
+            process.user,
+            process.command,
+            process.v_memory,
+            process.rss_memory,
+            process.shared_memory,
+            process.memory_uasge,
+            process.cpu_usage,
+            process.time,
+            process.priority,
+            process.nice,
+            process.ppid,
+            process.state,
+            process.threads
+        );
+    }
 
-    println!(
-        "PID: {} | User: {} | Command: {} | Virtual Memory: {:.2} MB | RSS Memory: {:.2} MB | Shared Memory: {:.2} MB | Memory Usage: {:.2}% | CPU Usage: {:.2}% | Time: {} | Priority: {} | Nice: {} | Parent PID: {} | State: {} | Threads: {}",
-        process.pid,
-        process.user,
-        process.command,
-        process.v_memory,
-        process.rss_memory,
-        process.shared_memory,
-        process.memory_uasge,
-        process.cpu_usage,
-        process.time,
-        process.priority,
-        process.nice,
-        process.ppid,
-        process.state,
-        process.threads
-    );
+    output
 }
-}
-
-

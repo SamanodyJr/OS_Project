@@ -1,6 +1,5 @@
-use std::env;
-use std::fmt::Write;
-use std::io;
+
+use overview::Process;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -8,19 +7,18 @@ use ratatui::{
     style::{palette::tailwind, Color, Stylize},
     symbols,
     text::Line,
-    widgets::{Block, Padding, Paragraph, Tabs, Widget},
+    widgets::{Block, Borders, Cell, Row, Table, Padding, Paragraph, Tabs, Widget},
     DefaultTerminal,
-    text::Text,
-    Frame
 };
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use color_eyre::Result;
 mod overview;
 pub use overview::print_process;
-
+pub use overview::get_processes;
+use tokio::time::{self, Duration};
 
 fn main() {
-    let mut terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
+    let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
     let app_result:std::result::Result<(), color_eyre::eyre::Error>= App::default().run(terminal);
     ratatui::restore();
     app_result.unwrap();
@@ -137,7 +135,7 @@ impl App {
 }
 
 fn render_title(area: Rect, buf: &mut Buffer) {
-    "Ratatui Tabs Example".bold().render(area, buf);
+    "Insert project title here (i forgot)".bold().render(area, buf);
 }
 
 fn render_footer(area: Rect, buf: &mut Buffer) {
@@ -168,9 +166,66 @@ impl SelectedTab {
     }
 
     fn render_tab0(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(print_process())
-            .block(self.block())
-            .render(area, buf);
+        let processes: Vec<Process> = get_processes();
+
+        let rows: Vec<Row> = processes.iter().map(|process| {
+            Row::new(vec![
+                Cell::from(process.pid.to_string()),
+                Cell::from(process.user.clone()),
+                Cell::from(process.command.clone()),
+                Cell::from(format!("{:.2} MB", process.v_memory)),
+                Cell::from(format!("{:.2} MB", process.rss_memory)),
+                Cell::from(format!("{:.2} MB", process.shared_memory)),
+                Cell::from(format!("{:.2}%", process.memory_uasge)),
+                Cell::from(format!("{:.2}%", process.cpu_usage)),
+                Cell::from(process.time.clone()),
+                Cell::from(process.priority.to_string()),
+                Cell::from(process.nice.to_string()),
+                Cell::from(process.ppid.to_string()),
+                Cell::from(process.state.clone()),
+                Cell::from(process.threads.to_string()),
+            ])
+        }).collect();
+
+        let widths = [
+            Constraint::Length(8),
+            Constraint::Length(10),
+            Constraint::Length(35),
+            Constraint::Length(20),
+            Constraint::Length(20),
+            Constraint::Length(15),
+            Constraint::Length(15),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(5),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(10),
+        ];
+
+
+        let table = Table::new(rows, widths)
+            .header(Row::new(vec![
+                Cell::from("PID"),
+                Cell::from("User"),
+                Cell::from("Command"),
+                Cell::from("Virtual Memory"),
+                Cell::from("RSS Memory"),
+                Cell::from("Shared Memory"),
+                Cell::from("Memory Usage"),
+                Cell::from("CPU Usage"),
+                Cell::from("Time"),
+                Cell::from("Priority"),
+                Cell::from("Nice"),
+                Cell::from("Parent PID"),
+                Cell::from("State"),
+                Cell::from("Threads"),
+            ]))
+            .block(Block::default().borders(Borders::ALL).title("Processes"))
+            .widths(&widths);
+
+        table.render(area, buf);
     }
 
     fn render_tab1(self, area: Rect, buf: &mut Buffer) {
