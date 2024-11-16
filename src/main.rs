@@ -2,17 +2,34 @@ use overview::Process;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
-    style::{palette::tailwind, Color, Stylize, Style},
-
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{palette::tailwind, Color, Style, Styled, Stylize, Modifier},
+    symbols,
     text::Line,
-    widgets::{Block, Borders, Cell, Row, Paragraph, Tabs, Table, Widget},    DefaultTerminal,
+    widgets::{block::Title, Block, Borders, Cell, Gauge, Padding, Paragraph, Row, Table, Tabs, Widget},
+    DefaultTerminal,
 };
+use std::{sync::{Arc, Mutex}, time::Duration};
+use std::thread::sleep;
+
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use color_eyre::Result;
 mod overview;
 pub use overview::print_process;
 pub use overview::get_processes;
+use tokio::time;
+
+mod cpuUsage;
+pub use cpuUsage::CpuUsage;
+pub use cpuUsage::cpu_result;
+mod Memory;
+use Memory::MemoryUsage;
+use Memory::Mem_Usage;
+
+mod IO;
+use IO::DiskUsage;
+use IO::Disk_Usage;
+
 
 fn main() {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
@@ -45,8 +62,7 @@ enum SelectedTab {
     Tab2,
     #[strum(to_string = "Memory")]
     Tab3,
-    #[strum(to_string = "I/O")]
-    Tab4,
+
 }
 
 impl App {
@@ -177,7 +193,6 @@ impl SelectedTab {
             Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed),
             Self::Tab2 => render_cpu(area, buf),
             Self::Tab3 => render_memory(area, buf),
-            Self::Tab4 => render_io(area, buf),
         }
     }
 
@@ -193,7 +208,6 @@ impl SelectedTab {
             Self::Tab1 => tailwind::BLUE,
             Self::Tab2 => tailwind::EMERALD,
             Self::Tab3 => tailwind::INDIGO,
-            Self::Tab4 => tailwind::RED,
         }
     }
 
@@ -447,9 +461,5 @@ fn render_memory(area: Rect, buf: &mut Buffer) {
     
 
 }
-fn render_io(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("I/O stats will be displayed here!")
-        .block(Block::default().borders(Borders::ALL).title("I/O"))
-        .render(area, buf);
-}
+
 
