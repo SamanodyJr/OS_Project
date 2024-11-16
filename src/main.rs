@@ -30,6 +30,19 @@ mod IO;
 use IO::DiskUsage;
 use IO::Disk_Usage;
 
+const gaugeBarColor: Color = tailwind::RED.c800;
+const gaugeTextColor: Color = tailwind::GREEN.c600;
+
+fn calculate_gauge_color(percent: u16) -> Color {
+    match percent {
+        0..=20 => tailwind::GREEN.c300,
+        21..=40 => tailwind::ORANGE.c500,
+        41..=60 => tailwind::ORANGE.c800,
+        61..=80 => tailwind::RED.c800,
+        _ => tailwind::RED.c900,
+    }
+}
+
 
 fn main() {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
