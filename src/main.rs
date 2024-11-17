@@ -8,7 +8,8 @@ pub use ctrl::terminate_process;
 pub use ctrl::suspend_process;
 pub use ctrl::resume_process;
 pub use ctrl::change_priority;
-
+use Memory::start_background_update_mem;
+use IO::start_background_update_io;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -61,7 +62,10 @@ struct App {
     selected_row: usize,
     is_cursed: bool,
     pub vertical_scroll: usize,
-    process_data: Arc<Mutex<Vec<Process>>>
+    process_data: Arc<Mutex<Vec<Process>>>,
+    is_priority: bool,
+    memory_usage: Arc<Mutex<MemoryUsage>>,
+    disk_usage: Arc<Mutex<DiskUsage>>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +90,9 @@ enum SelectedTab {
 impl App {
     fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while self.state == AppState::Running {
+            start_background_update_mem(Arc::clone(&self.memory_usage));
             start_background_update(Arc::clone(&self.process_data));
+            start_background_update_io(Arc::clone(&self.disk_usage));
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             self.handle_events()?;
         }
@@ -131,13 +137,45 @@ impl App {
     }
 
     pub fn priority(&mut self) {
-        
+        self.is_priority = !self.is_priority;
+    
         let data = self.process_data.lock().unwrap();
-
         let filtered_data: Vec<&Process> = data.iter()
-        .filter(|process| process.user != "root")
-        .collect();
-    }
+            .filter(|process| process.user != "root")
+            .collect();
+    
+        // if self.is_priority && self.is_cursed {
+    
+        //     let mut new_priority = String::new();
+    
+        //     if let Event::Key(key) = event::read().unwrap() {
+        //         if key.kind == KeyEventKind::Press {
+        //             match key.code {
+        //                 KeyCode::Char(c) => {
+        //                     new_priority.push(c);
+        //                 }
+        //                 KeyCode::Enter => {
+        //                     if let Ok(priority) = new_priority.parse::<i32>() {
+        //                         if let Some(process) = filtered_data.get(self.selected_row) {
+        //                            change_priority(process.pid, priority) ;
+        //                         }
+        //                     } else {
+        //                         Line::raw("Invalid priority! Please enter a number between -20 and 19.")
+        //                             .centered()
+        //                             .render(footer_area, buf);
+        //                     }
+        //                     self.is_priority = false;
+        //                 }
+        //                 KeyCode::Esc => {
+        //                     self.is_priority = false;
+        //                 }
+        //                 _ => {}
+        //             }
+                }
+            //}
+        //}
+    //}
+    
 
     pub fn kill(&mut self) {
         
@@ -256,7 +294,7 @@ impl Widget for &App {
         render_title(title_area, buf);
         self.render_tabs(tabs_area, buf);
         self.selected_tab.render(inner_area, buf, self); 
-        render_footer(footer_area, buf, self.selected_tab, self.is_cursed);
+        render_footer(footer_area, buf, self.selected_tab, self.is_cursed, self.is_priority);
     }
 }
 
@@ -278,11 +316,18 @@ fn render_title(area: Rect, buf: &mut Buffer) {
     "ProcMaster".bold().render(area, buf);
 }
 
-fn render_footer(area: Rect, buf: &mut Buffer, selected_tab: SelectedTab, cursor:bool) {
+fn render_footer(area: Rect, buf: &mut Buffer, selected_tab: SelectedTab, cursor:bool, priority:bool) {
     if cursor && selected_tab == SelectedTab::Tab1 {
-        Line::raw("← → to change tab | Press q to quit | Press c to cursor | ↑ ↓ to move | k to kill | t to terminate | s to suspend | r to resume | p to set priority")
-        .centered()
-        .render(area, buf);
+        if priority {
+            // If we're in the priority change mode, show a different message
+            Line::raw("Enter new priority (1-20): Press Enter to confirm, Esc to cancel.")
+                .centered()
+                .render(area, buf);
+        } else {
+            Line::raw("← → to change tab | Press q to quit | Press c to cursor | ↑ ↓ to move | k to kill | t to terminate | s to suspend | r to resume | p to set priority")
+                .centered()
+                .render(area, buf);
+        }
     }
     else if selected_tab == SelectedTab::Tab1 {
         
@@ -303,7 +348,7 @@ impl SelectedTab {
         match self {
             Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed,app.process_data.clone(), app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
-            Self::Tab3 => render_memory(area, buf),
+            Self::Tab3 => render_memory(area, buf, app.memory_usage.clone(), app.disk_usage.clone()),
         }
     }
 
@@ -464,8 +509,8 @@ fn render_cpu(area: Rect, buf: &mut Buffer) {
     }
 }
 
-fn render_memory(area: Rect, buf: &mut Buffer) {
-    let memory = Mem_Usage();
+fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsage>>, disk: Arc<Mutex<DiskUsage>>) {    
+    let memory = memory_usage.lock().unwrap();
     let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
     let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
     let gauge = Gauge::default()
@@ -530,7 +575,7 @@ fn render_memory(area: Rect, buf: &mut Buffer) {
     table.render(left_chunks[1], buf);
     table_swap.render(right_chunks[1], buf);
 
-    let disk_usage = Disk_Usage();
+    let disk_usage = disk.lock().unwrap();
     let disk_rows = vec![
         Row::new(vec![
             Cell::from("Device Name"),
