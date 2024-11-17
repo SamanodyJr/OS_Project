@@ -198,7 +198,6 @@ pub fn print_process() -> String {
 pub fn start_background_update(process_data: Arc<Mutex<Vec<Process>>>) {
     thread::spawn(move || loop {
         // Update process data every second
-        thread::sleep(Duration::from_secs(3));
 
         // Lock ProcessData and update it
         let new_data = get_processes();
@@ -206,5 +205,7 @@ pub fn start_background_update(process_data: Arc<Mutex<Vec<Process>>>) {
         // Lock the mutex and replace its contents
         let mut data = process_data.lock().unwrap();
         *data = new_data;
+
+        thread::sleep(Duration::from_secs(3));
     });
 }

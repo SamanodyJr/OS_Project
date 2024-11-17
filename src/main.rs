@@ -109,6 +109,7 @@ impl App {
                     KeyCode::Char('s') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.suspend(),
                     KeyCode::Char('r') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.resume(),
                     KeyCode::Char('t') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.terminate(),
+                    KeyCode::Char('p') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.priority(),
                     _ => {}
                 }
             }
@@ -127,6 +128,15 @@ impl App {
         if self.vertical_scroll < process_count.saturating_sub(1) {
             self.vertical_scroll += 1;
         }
+    }
+
+    pub fn priority(&mut self) {
+        
+        let data = self.process_data.lock().unwrap();
+
+        let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
     }
 
     pub fn kill(&mut self) {
