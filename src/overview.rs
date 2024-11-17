@@ -3,9 +3,13 @@ use procfs::{ticks_per_second,Uptime};
 use sysinfo::{System, SystemExt};
 use users::get_user_by_uid;
 use std::fmt::Write;
+use std::thread;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 
 pub struct ProcessInfo {
-    pid: u32,
+    pid: i32,
     command: String,
     user: String,
     v_memory: f64, 
@@ -19,10 +23,7 @@ pub struct ProcessInfo {
     ppid: i32,
     state: String,
     threads: i64,
-    
 }
-
-
 
 fn seconds_to_hhmmss(seconds: f64) -> String {
     let scnds = seconds as u64;
@@ -47,7 +48,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
             for process in processes {
                 if let Ok(proc) = process {
                     if let Ok(stat) = proc.stat(){
-                        let pid: u32 = proc.pid as u32;
+                        let pid: i32 = proc.pid as i32;
                         let uid: u32 = proc.uid().unwrap() as u32;
                         let user = get_user_by_uid(uid).unwrap().name().to_str().map(|s| s.to_string()).unwrap();
                         let command = stat.comm.clone();
@@ -55,7 +56,19 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
                         let page_size: f64 = procfs::page_size().unwrap() as f64;
                         let v_memory: f64 = stat.vsize as f64 / (1024.0 * 1024.0);
                         let rss_memory: f64 = (stat.rss as f64 * page_size) / (1024.0 * 1024.0);
-                        let shared_memory: f64 = (proc.statm().unwrap().shared as f64 * page_size) / (1024.0 * 1024.0);
+                        // let shared_memory: f64 = (proc.statm().unwrap().shared as f64 * page_size) / (1024.0 * 1024.0);
+                        let shared_memory: f64 = match proc.statm() {
+                            Ok(statm) => {
+                                if statm.shared < 0 {
+                                    0.0 // If shared memory is negative, treat it as 0
+                                } else {
+                                    (statm.shared as f64 * page_size) / (1024.0 * 1024.0) // Convert shared memory to MB
+                                }
+                            }
+                            Err(_) => {
+                                0.0 // If statm fails, assume no shared memory available
+                            }
+                        };
                         // let disk_read: f64 = proc.io().unwrap().read_bytes as f64 / (1024.0 * 1024.0);
                         // let disk_write: f64 = proc.io().unwrap().write_bytes as f64 / (1024.0 * 1024.0);
                         
@@ -112,7 +125,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
 }
 #[derive(Clone)]
 pub struct Process {
-    pub pid: u32,
+    pub pid: i32,
     pub user: String,
     pub command: String,
     pub v_memory: f64,
@@ -180,4 +193,18 @@ pub fn print_process() -> String {
     }
 
     output
+}
+
+pub fn start_background_update(process_data: Arc<Mutex<Vec<Process>>>) {
+    thread::spawn(move || loop {
+        // Update process data every second
+        thread::sleep(Duration::from_secs(3));
+
+        // Lock ProcessData and update it
+        let new_data = get_processes();
+
+        // Lock the mutex and replace its contents
+        let mut data = process_data.lock().unwrap();
+        *data = new_data;
+    });
 }

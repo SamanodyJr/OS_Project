@@ -1,18 +1,51 @@
-use overview::Process;
+use overview::{start_background_update,Process};
+mod ctrl;
+use std::sync::{Mutex,Arc};
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::{Pid};
+pub use ctrl::kill_process;
+pub use ctrl::terminate_process;
+pub use ctrl::suspend_process;
+pub use ctrl::resume_process;
+pub use ctrl::change_priority;
+
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
-    style::{palette::tailwind, Color, Stylize, Style},
-
+    layout::{Constraint, Layout, Rect, Direction},
+    style::{palette::tailwind, Color, Style, Styled, Stylize, Modifier},
     text::Line,
-    widgets::{Block, Borders, Cell, Row, Paragraph, Tabs, Table, Widget},    DefaultTerminal,
+    widgets::{Block, Borders, Cell, Row, Paragraph, Tabs, Table, Widget, Gauge},    DefaultTerminal,
 };
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use color_eyre::Result;
 mod overview;
 pub use overview::print_process;
 pub use overview::get_processes;
+
+mod cpuUsage;
+pub use cpuUsage::CpuUsage;
+pub use cpuUsage::cpu_result;
+mod Memory;
+use Memory::MemoryUsage;
+use Memory::Mem_Usage;
+
+mod IO;
+use IO::DiskUsage;
+use IO::Disk_Usage;
+
+const gaugeBarColor: Color = tailwind::RED.c800;
+const gaugeTextColor: Color = tailwind::GREEN.c600;
+
+fn calculate_gauge_color(percent: u16) -> Color {
+    match percent {
+        0..=20 => tailwind::GREEN.c300,
+        21..=40 => tailwind::ORANGE.c500,
+        41..=60 => tailwind::ORANGE.c800,
+        61..=80 => tailwind::RED.c800,
+        _ => tailwind::RED.c900,
+    }
+}
 
 fn main() {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
@@ -27,6 +60,8 @@ struct App {
     selected_tab: SelectedTab,
     selected_row: usize,
     is_cursed: bool,
+    pub vertical_scroll: usize,
+    process_data: Arc<Mutex<Vec<Process>>>
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -43,15 +78,15 @@ enum SelectedTab {
     Tab1,
     #[strum(to_string = "CPU")]
     Tab2,
-    #[strum(to_string = "Memory")]
+    #[strum(to_string = "Memory/IO")]
     Tab3,
-    #[strum(to_string = "I/O")]
-    Tab4,
+
 }
 
 impl App {
     fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while self.state == AppState::Running {
+            start_background_update(Arc::clone(&self.process_data));
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             self.handle_events()?;
         }
@@ -68,7 +103,12 @@ impl App {
                     KeyCode::Char('c') if self.selected_tab == SelectedTab::Tab1 =>self.curse(),
                     KeyCode::Up if self.is_cursed => self.move_cursor_up(),  
                     KeyCode::Down if self.is_cursed => self.move_cursor_down(), 
+                    KeyCode::Up => self.scroll_up(),
+                    KeyCode::Down => self.scroll_down(),
                     KeyCode::Char('k') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.kill(),
+                    KeyCode::Char('s') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.suspend(),
+                    KeyCode::Char('r') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.resume(),
+                    KeyCode::Char('t') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.terminate(),
                     _ => {}
                 }
             }
@@ -76,20 +116,96 @@ impl App {
         Ok(())
     }
 
+    pub fn scroll_up(&mut self) {
+        if self.vertical_scroll > 0 {
+            self.vertical_scroll -= 1;
+        }
+    }
+    pub fn scroll_down(&mut self) {
+        let data = self.process_data.lock().unwrap();
+        let process_count = data.len();
+        if self.vertical_scroll < process_count.saturating_sub(1) {
+            self.vertical_scroll += 1;
+        }
+    }
+
     pub fn kill(&mut self) {
         
-        // let selected_process = processes.get(self.selected_row);
-        // if let Some(process) = selected_process {
-        //     let pid = process.pid;
-        //     let _ = print_process(pid);
-        // }
+        let data = self.process_data.lock().unwrap();
+
+        let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
+
+        if let Some(process) = filtered_data.get(self.selected_row) {
+            let pid = process.pid; 
+            let p_id = Pid::from_raw(pid);
+            if let Err(err) = kill(p_id, Signal::SIGKILL) {
+                eprintln!("Failed to send signal to process {}: {}", pid, err);
+            }
+        }
+    }
+    pub fn terminate(&mut self) {
+        
+        let data = self.process_data.lock().unwrap();
+
+        let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
+
+        if let Some(process) = filtered_data.get(self.selected_row) {
+            let pid = process.pid; 
+            let p_id = Pid::from_raw(pid);
+            if let Err(err) = kill(p_id, Signal::SIGTERM) {
+                eprintln!("Failed to send signal to process {}: {}", pid, err);
+            }
+        }
+    }
+    pub fn resume(&mut self) {
+        
+        let data = self.process_data.lock().unwrap();
+
+        let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
+
+        if let Some(process) = filtered_data.get(self.selected_row) {
+            let pid = process.pid; 
+            let p_id = Pid::from_raw(pid);
+            if let Err(err) = kill(p_id, Signal::SIGCONT) {
+                eprintln!("Failed to send signal to process {}: {}", pid, err);
+            }
+        }
+    }
+    pub fn suspend(&mut self) {
+        
+        let data = self.process_data.lock().unwrap();
+
+        let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
+
+        if let Some(process) = filtered_data.get(self.selected_row) {
+            let pid = process.pid; 
+            let p_id = Pid::from_raw(pid);
+            if let Err(err) = kill(p_id, Signal::SIGSTOP) {
+                eprintln!("Failed to send signal to process {}: {}", pid, err);
+            }
+        }
     }
 
     pub fn curse(&mut self) {
         self.is_cursed = !self.is_cursed;
-        self.selected_row = 0;
         
+        self.selected_row = self.vertical_scroll;
+    
+        let data = self.process_data.lock().unwrap();
+        let process_count = data.len();
+        if self.selected_row >= process_count {
+            self.selected_row = process_count.saturating_sub(1);
+        }
     }
+    
     pub fn move_cursor_up(&mut self) {
         if self.selected_row > 0 {
             self.selected_row -= 1;  
@@ -97,7 +213,8 @@ impl App {
     }
 
     pub fn move_cursor_down(&mut self) {
-        let process_count = get_processes().len();
+        let data = self.process_data.lock().unwrap();
+        let process_count = data.len();
         if self.selected_row < process_count.saturating_sub(1) {
             self.selected_row += 1;  
         }
@@ -174,10 +291,9 @@ impl SelectedTab {
     fn render(self, area: Rect, buf: &mut Buffer, app: &App) {
 
         match self {
-            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed),
+            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed,app.process_data.clone(), app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
             Self::Tab3 => render_memory(area, buf),
-            Self::Tab4 => render_io(area, buf),
         }
     }
 
@@ -193,7 +309,6 @@ impl SelectedTab {
             Self::Tab1 => tailwind::BLUE,
             Self::Tab2 => tailwind::EMERALD,
             Self::Tab3 => tailwind::INDIGO,
-            Self::Tab4 => tailwind::RED,
         }
     }
 
@@ -210,11 +325,20 @@ impl SelectedTab {
     }
 }
 
-fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool) {
-    let processes: Vec<Process> = get_processes();
-    
-    let rows: Vec<Row> = processes.iter().enumerate().map(|(index, process)| {
-        let is_selected = index == selected_row;
+fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, processes: Arc<Mutex<Vec<Process>>>, vertical_scroll: usize) {
+    let data = processes.lock().unwrap();
+
+    let filtered_data: Vec<&Process> = data.iter()
+        .filter(|process| process.user != "root")
+        .collect();
+   
+    let max_visible_rows = (area.height as usize) - 2;
+    let start_index = vertical_scroll;
+    let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
+    let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
+    {   
+        let global_index = start_index + index;
+        let is_selected = global_index == selected_row;
         let style = if is_selected && is_cursed {
             Style::default()
                 .fg(Color::Blue).bold()  
@@ -284,20 +408,167 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
 
 
 fn render_cpu(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("CPU stats will be displayed here!")
-        .block(Block::default().borders(Borders::ALL).title("CPU"))
-        .render(area, buf);
+    let cpu_usages: Vec<CpuUsage> = cpu_result();
+        
+    let gauges: Vec<Gauge> = cpu_usages.iter().map(|cpu_usage| {
+        let percent_value = cpu_usage.cpu_usage as u16;
+        let label = format!("{:.1}%", cpu_usage.cpu_usage);
+        let gauge_color = calculate_gauge_color(percent_value);
+
+        Gauge::default()
+            .block(Block::default().title(format!("CPU {} Usage", cpu_usage.core_number)).borders(Borders::ALL))
+            .gauge_style(gauge_color)
+            .percent(percent_value as u16)
+            .label(label)
+            .set_style(Style::default().fg(gaugeTextColor))
+    }).collect();
+
+    // Split the area into two columns
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(area);
+
+    // Split each column into rows for the gauges
+    let left_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+    let right_column_constraints: Vec<Constraint> = vec![Constraint::Length((gauges.len() / 2) as u16); gauges.len() / 2];
+
+    let left_column_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(left_column_constraints)
+        .split(columns[0]);
+
+    let right_column_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(right_column_constraints)
+        .split(columns[1]);
+
+    // Render the gauges in the left column
+    for (i, gauge) in gauges.iter().take(gauges.len() / 2).enumerate() {
+        gauge.render(left_column_chunks[i], buf);
+    }
+
+    // Render the gauges in the right column
+    for (i, gauge) in gauges.iter().skip(gauges.len() / 2).enumerate() {
+        gauge.render(right_column_chunks[i], buf);
+    }
 }
 
 fn render_memory(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("Memory stats will be displayed here!")
+    let memory = Mem_Usage();
+    let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
+    let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
+    let gauge = Gauge::default()
+        .block(Block::default().title("Memory Usage").borders(Borders::ALL))
+        .gauge_style(gauge_color)
+        .percent(((memory.used / memory.total) * 100.0) as u16)
+        .label(format!("{:.1}%", (memory.used / memory.total) * 100.0))
+        .set_style(Style::default().fg(gaugeTextColor));
+    let swap_gauge = Gauge::default()
+        .block(Block::default().title("Swap Usage").borders(Borders::ALL))
+        .gauge_style(gauge_color_swap)
+        .percent(((memory.used_swap / memory.total_swap) * 100.0) as u16)
+        .label(format!("{:.1}%", (memory.used_swap / memory.total_swap) * 100.0))
+        .set_style(Style::default().fg(gaugeTextColor));
+    let rows = vec![
+        Row::new(vec![
+            Cell::from("Total Memory"),
+            Cell::from(format!("{:.2} GB", memory.total)),
+        ]),
+        Row::new(vec![
+            Cell::from("Used Memory"),
+            Cell::from(format!("{:.2} GB", memory.used)),
+        ]),
+        Row::new(vec![
+            Cell::from("Free Memory").style(Style::default().add_modifier(Modifier::BOLD)),
+            Cell::from(format!("{:.2} GB", memory.free)),
+        ])];
+        let row_swap = vec![
+        Row::new(vec![
+            Cell::from("Total Swap"),
+            Cell::from(format!("{:.2} MB", memory.total_swap)),
+        ]),
+        Row::new(vec![
+            Cell::from("Used Swap"),
+            Cell::from(format!("{:.2} MB", memory.used_swap)),
+        ]),
+        Row::new(vec![
+            Cell::from("Free Swap"),
+            Cell::from(format!("{:.2} MB", memory.free_swap)),
+        ]),
+    ];
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(area);
+    let table = Table::new(rows, [Constraint::Length(20), Constraint::Length(20)])
         .block(Block::default().borders(Borders::ALL).title("Memory"))
-        .render(area, buf);
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+    let table_swap = Table::new(row_swap, [Constraint::Length(20), Constraint::Length(20)])
+        .block(Block::default().borders(Borders::ALL).title("Swap"))
+        .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+        .split(columns[0]);
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(10), Constraint::Percentage(10)].as_ref())
+        .split(columns[1]);
+    gauge.render(left_chunks[0], buf);
+    swap_gauge.render(right_chunks[0], buf);
+    table.render(left_chunks[1], buf);
+    table_swap.render(right_chunks[1], buf);
+
+    let disk_usage = Disk_Usage();
+    let disk_rows = vec![
+        Row::new(vec![
+            Cell::from("Device Name"),
+            Cell::from(disk_usage.device_name.clone()),
+        ]),
+        Row::new(vec![
+            Cell::from("Reads Completed"),
+            Cell::from(disk_usage.reads_completed.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time Reading"),
+            Cell::from(disk_usage.time_reading.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Writes Completed"),
+            Cell::from(disk_usage.writes_completed.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time Writing"),
+            Cell::from(disk_usage.time_writing.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("I/O in Progress"),
+            Cell::from(disk_usage.io_in_progress.to_string()),
+        ]),
+        Row::new(vec![
+            Cell::from("Time I/O"),
+            Cell::from(disk_usage.time_io.to_string()),
+        ]),
+    ];
+    let disk_table1 = Table::new(
+        disk_rows.iter().take(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+        [Constraint::Length(20), Constraint::Length(20)],
+    )
+    .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 1"))
+    .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+    let disk_table2 = Table::new(
+        disk_rows.iter().skip(disk_rows.len() / 2).cloned().collect::<Vec<_>>(),
+        [Constraint::Length(20), Constraint::Length(20)],
+    )
+    .block(Block::default().borders(Borders::ALL).title("Disk Usage Part 2"))
+    .widths(&[Constraint::Length(20), Constraint::Length(20)]);
+
+    disk_table1.render(left_chunks[2], buf);
+    disk_table2.render(right_chunks[2], buf);
+    
+
 }
 
-fn render_io(area: Rect, buf: &mut Buffer) {
-    Paragraph::new("I/O stats will be displayed here!")
-        .block(Block::default().borders(Borders::ALL).title("I/O"))
-        .render(area, buf);
-}
 
