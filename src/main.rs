@@ -29,10 +29,13 @@ pub use cpuUsage::cpu_result;
 mod Memory;
 use Memory::MemoryUsage;
 use Memory::Mem_Usage;
+use Memory::start_background_update_mem;
 
 mod IO;
 use IO::DiskUsage;
 use IO::Disk_Usage;
+use IO::start_background_update_io;
+
 
 const gaugeBarColor: Color = tailwind::RED.c800;
 const gaugeTextColor: Color = tailwind::GREEN.c600;
@@ -61,7 +64,9 @@ struct App {
     selected_row: usize,
     is_cursed: bool,
     pub vertical_scroll: usize,
-    process_data: Arc<Mutex<Vec<Process>>>
+    process_data: Arc<Mutex<Vec<Process>>>,
+    memory_usage: Arc<Mutex<MemoryUsage>>,
+    disk_usage: Arc<Mutex<DiskUsage>>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +91,9 @@ enum SelectedTab {
 impl App {
     fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while self.state == AppState::Running {
+            start_background_update_mem(Arc::clone(&self.memory_usage));
             start_background_update(Arc::clone(&self.process_data));
+            start_background_update_io(Arc::clone(&self.disk_usage));
             terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             self.handle_events()?;
         }
@@ -303,7 +310,7 @@ impl SelectedTab {
         match self {
             Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed,app.process_data.clone(), app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
-            Self::Tab3 => render_memory(area, buf),
+            Self::Tab3 => render_memory(area, buf, app.memory_usage.clone(), app.disk_usage.clone()),
         }
     }
 
@@ -464,8 +471,8 @@ fn render_cpu(area: Rect, buf: &mut Buffer) {
     }
 }
 
-fn render_memory(area: Rect, buf: &mut Buffer) {
-    let memory = Mem_Usage();
+fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsage>>, disk: Arc<Mutex<DiskUsage>>) {
+    let memory = memory_usage.lock().unwrap();
     let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
     let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
     let gauge = Gauge::default()
@@ -530,7 +537,7 @@ fn render_memory(area: Rect, buf: &mut Buffer) {
     table.render(left_chunks[1], buf);
     table_swap.render(right_chunks[1], buf);
 
-    let disk_usage = Disk_Usage();
+    let disk_usage = disk.lock().unwrap();
     let disk_rows = vec![
         Row::new(vec![
             Cell::from("Device Name"),

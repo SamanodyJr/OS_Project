@@ -3,7 +3,11 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use std::thread;
 
+#[derive(Default)]
 pub struct DiskUsage {
     pub device_name: String,
     pub reads_completed: u64,
@@ -113,4 +117,20 @@ fn strip_partition_suffix(device: &str) -> String
         }
     }
     device.to_string()
+}
+
+pub fn start_background_update_io(memory_usage: Arc<Mutex<DiskUsage>>) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(1));
+        // Update process data every second
+
+        // Lock ProcessData and update it
+        let new_data = Disk_Usage();
+
+        // Lock the mutex and replace its contents
+        let mut data = memory_usage.lock().unwrap();
+        *data = new_data;
+
+        
+    });
 }
