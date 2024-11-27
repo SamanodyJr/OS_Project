@@ -2,12 +2,13 @@ use overview::{start_background_update,Process};
 mod ctrl;
 use std::sync::{Mutex,Arc};
 use nix::sys::signal::{kill, Signal};
-use nix::unistd::{Pid};
+use nix::unistd::Pid;
 pub use ctrl::kill_process;
 pub use ctrl::terminate_process;
 pub use ctrl::suspend_process;
 pub use ctrl::resume_process;
 pub use ctrl::change_priority;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
@@ -15,7 +16,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect, Direction},
     style::{palette::tailwind, Color, Style, Styled, Stylize, Modifier},
     text::Line,
-    widgets::{Block, Borders, Cell, Row, Paragraph, Tabs, Table, Widget, Gauge},    DefaultTerminal,
+    widgets::{Block, Borders, Cell, Row, Tabs, Table, Widget, Gauge},    DefaultTerminal,
 };
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use color_eyre::Result;
@@ -40,6 +41,8 @@ use IO::start_background_update_io;
 const gaugeBarColor: Color = tailwind::RED.c800;
 const gaugeTextColor: Color = tailwind::GREEN.c600;
 
+
+
 fn calculate_gauge_color(percent: u16) -> Color {
     match percent {
         0..=20 => tailwind::GREEN.c300,
@@ -50,26 +53,33 @@ fn calculate_gauge_color(percent: u16) -> Color {
     }
 }
 
+
 fn main() {
     let terminal: ratatui::Terminal<ratatui::prelude::CrosstermBackend<std::io::Stdout>> = ratatui::init();
-    let app_result: std::result::Result<(), color_eyre::eyre::Error> = App::default().run(terminal);
+    let mut app = App::default();
+    
+    
+    start_background_update_mem(Arc::clone(&app.memory_usage));
+    start_background_update(Arc::clone(&app.process_data));
+    start_background_update_io(Arc::clone(&app.disk_usage));
+    let app_result: std::result::Result<(), color_eyre::eyre::Error> = app.run(terminal);
     ratatui::restore();
     app_result.unwrap();
 }
 
 #[derive(Default)]
-struct App {
+pub struct App {
     state: AppState,
     selected_tab: SelectedTab,
     selected_row: usize,
     is_cursed: bool,
     pub vertical_scroll: usize,
-    process_data: Arc<Mutex<Vec<Process>>>,
-    memory_usage: Arc<Mutex<MemoryUsage>>,
-    disk_usage: Arc<Mutex<DiskUsage>>,
+    pub process_data: Arc<Mutex<Vec<Process>>>,
+    pub memory_usage: Arc<Mutex<MemoryUsage>>,
+    pub disk_usage: Arc<Mutex<DiskUsage>>,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 enum AppState {
     #[default]
     Running,
@@ -89,13 +99,21 @@ enum SelectedTab {
 }
 
 impl App {
-    fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
+        let mut last_update = Instant::now();
+        let update_interval = Duration::from_millis(100); // Refresh every 500ms
+    
         while self.state == AppState::Running {
-            start_background_update_mem(Arc::clone(&self.memory_usage));
-            start_background_update(Arc::clone(&self.process_data));
-            start_background_update_io(Arc::clone(&self.disk_usage));
-            terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
-            self.handle_events()?;
+            // Force redraw periodically
+            if last_update.elapsed() >= update_interval {
+                terminal.draw(|frame| frame.render_widget(&*self, frame.area()))?;
+                last_update = Instant::now();
+            }
+            
+            // Check for input events
+            if event::poll(Duration::from_millis(10))? {
+                self.handle_events()?;
+            }
         }
         Ok(())
     }
@@ -104,8 +122,8 @@ impl App {
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
                 match key.code {
-                    KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
-                    KeyCode::Char('h') | KeyCode::Left => self.previous_tab(),
+                    KeyCode::Right => self.next_tab(),
+                    KeyCode::Left => self.previous_tab(),
                     KeyCode::Char('q') | KeyCode::Esc => self.quit(),
                     KeyCode::Char('c') if self.selected_tab == SelectedTab::Tab1 =>self.curse(),
                     KeyCode::Up if self.is_cursed => self.move_cursor_up(),  
@@ -343,12 +361,14 @@ impl SelectedTab {
 }
 
 fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, processes: Arc<Mutex<Vec<Process>>>, vertical_scroll: usize) {
-    let data = processes.lock().unwrap();
-
-    let filtered_data: Vec<&Process> = data.iter()
-        .filter(|process| process.user != "root")
-        .collect();
-   
+    
+    let filtered_data: Vec<Process> = {
+        let data = processes.lock().unwrap();
+        data.iter()
+            .filter(|process| process.user != "root")
+            .cloned() // Cloning Process objects to avoid holding the lock during rendering
+            .collect()
+    };
     let max_visible_rows = (area.height as usize) - 2;
     let start_index = vertical_scroll;
     let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 

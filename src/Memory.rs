@@ -7,6 +7,7 @@ use sysinfo::{System, SystemExt, RefreshKind};
 
 #[derive(Clone)]
 #[derive(Default)]
+#[derive(Debug)]
 pub struct MemoryUsage {
     pub used: f64,
     pub free: f64,
@@ -76,7 +77,7 @@ pub fn Mem_Usage() -> MemoryUsage {
 
 pub fn start_background_update_mem(memory_usage: Arc<Mutex<MemoryUsage>>) {
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(1));
+        
         // Update process data every second
 
         // Lock ProcessData and update it
@@ -85,7 +86,7 @@ pub fn start_background_update_mem(memory_usage: Arc<Mutex<MemoryUsage>>) {
         // Lock the mutex and replace its contents
         let mut data = memory_usage.lock().unwrap();
         *data = new_data;
-
+        thread::sleep(Duration::from_secs(1));
         
     });
 }

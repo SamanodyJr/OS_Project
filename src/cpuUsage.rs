@@ -1,4 +1,3 @@
-use sysinfo::{System, Disk};
 use std::thread::sleep;
 use std::time::Duration;
 use std::path::Path;
@@ -51,7 +50,7 @@ pub struct CpuUsage {
 
 pub fn cpu_result() -> Vec<CpuUsage> {
     let mut cpu_usages = Vec::new();
-    let mut prev_cpu_stats = read_cpu_stat().unwrap();
+    let prev_cpu_stats = read_cpu_stat().unwrap();
     sleep(Duration::from_secs(1));
     let curr_cpu_stats = read_cpu_stat().unwrap();
 

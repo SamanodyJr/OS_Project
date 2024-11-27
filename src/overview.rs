@@ -124,6 +124,7 @@ pub fn get_processes_info() -> Vec<ProcessInfo> {
         return processes_info;
 }
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct Process {
     pub pid: i32,
     pub user: String,
@@ -197,7 +198,7 @@ pub fn print_process() -> String {
 
 pub fn start_background_update(process_data: Arc<Mutex<Vec<Process>>>) {
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(1));
+        
         // Update process data every second
 
         // Lock ProcessData and update it
@@ -206,7 +207,7 @@ pub fn start_background_update(process_data: Arc<Mutex<Vec<Process>>>) {
         // Lock the mutex and replace its contents
         let mut data = process_data.lock().unwrap();
         *data = new_data;
-
+        thread::sleep(Duration::from_millis(500));
         
     });
 }

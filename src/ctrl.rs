@@ -1,9 +1,9 @@
 use nix::sys::signal::{kill, Signal};
-use nix::unistd::{Pid};
+use nix::unistd::Pid;
 //use scheduler::Which::Process;
 use std::process::Command;
 use std::process::Stdio;
-use procfs::process::all_processes;
+// use procfs::process::all_processes;
 //use scheduler::set_priority;
 
 
@@ -33,28 +33,28 @@ fn send_signal(pid: i32, signal: Signal) -> Result<(), String> {
 
 
 
-pub fn killall(process_name: &str) -> Result<(), String> {
-    let processes = all_processes().map_err(|err| format!("Failed to list processes: {}", err))?;
-    let mut errors = Vec::new();
+// pub fn killall(process_name: &str) -> Result<(), String> {
+//     let processes = all_processes().map_err(|err| format!("Failed to list processes: {}", err))?;
+//     let mut errors = Vec::new();
 
-    for process in processes {
-        if let Ok(proc) = process {
-            if let Ok(stat) = proc.stat() {
-                if stat.comm == process_name {
-                    if let Err(err) = terminate_process(stat.pid) {
-                        errors.push(err);
-                    }
-                }
-            }
-        }
-    }
+//     for process in processes {
+//         if let Ok(proc) = process {
+//             if let Ok(stat) = proc.stat() {
+//                 if stat.comm == process_name {
+//                     if let Err(err) = terminate_process(stat.pid) {
+//                         errors.push(err);
+//                     }
+//                 }
+//             }
+//         }
+//     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join(", "))
-    }
-}
+//     if errors.is_empty() {
+//         Ok(())
+//     } else {
+//         Err(errors.join(", "))
+//     }
+// }
 pub fn change_priority(pid: i32, priority: i32) -> bool {
     if priority < -20 || priority > 19 {
         return false;
