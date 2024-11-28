@@ -101,7 +101,7 @@ enum SelectedTab {
 impl App {
     fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
         let mut last_update = Instant::now();
-        let update_interval = Duration::from_millis(100); // Refresh every 500ms
+        let update_interval = Duration::from_millis(1000); // Refresh every 500ms
     
         while self.state == AppState::Running {
             // Force redraw periodically
@@ -111,7 +111,7 @@ impl App {
             }
             
             // Check for input events
-            if event::poll(Duration::from_millis(10))? {
+            if event::poll(Duration::from_millis(100))? {
                 self.handle_events()?;
             }
         }
@@ -326,9 +326,9 @@ impl SelectedTab {
     fn render(self, area: Rect, buf: &mut Buffer, app: &App) {
 
         match self {
-            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed,app.process_data.clone(), app.vertical_scroll),
+            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed, app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
-            Self::Tab3 => render_memory(area, buf, app.memory_usage.clone(), app.disk_usage.clone()),
+            Self::Tab3 => render_memory(area, buf),
         }
     }
 
@@ -360,29 +360,26 @@ impl SelectedTab {
     }
 }
 
-fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, processes: Arc<Mutex<Vec<Process>>>, vertical_scroll: usize) {
+fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, vertical_scroll: usize) {
     
-    let filtered_data: Vec<Process> = {
-        let data = processes.lock().unwrap();
+    let cached_data = {
+        let data = get_processes();
         data.iter()
             .filter(|process| process.user != "root")
-            .cloned() // Cloning Process objects to avoid holding the lock during rendering
-            .collect()
+            .cloned()
+            .collect::<Vec<_>>() // Cache filtered data
     };
-    let max_visible_rows = (area.height as usize) - 2;
-    let start_index = vertical_scroll;
-    let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
-    let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
-    {   
-        let global_index = start_index + index;
-        let is_selected = global_index == selected_row;
+
+    let max_visible_rows = area.height.saturating_sub(2) as usize;
+    let visible_range = vertical_scroll..std::cmp::min(vertical_scroll + max_visible_rows, cached_data.len());
+    let visible_rows = &cached_data[visible_range];
+ 
+    let rows: Vec<Row> = visible_rows.iter().enumerate().map(|(i, process)| {
+        let is_selected = vertical_scroll + i == selected_row;
         let style = if is_selected && is_cursed {
-            Style::default()
-                .fg(Color::Blue).bold()  
-                .bg(Color::LightGreen)  
-                 
+            Style::default().fg(Color::Blue).bg(Color::LightGreen).bold()
         } else {
-            Style::default() 
+            Style::default()
         };
         
         Row::new(vec![
@@ -491,8 +488,8 @@ fn render_cpu(area: Rect, buf: &mut Buffer) {
     }
 }
 
-fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsage>>, disk: Arc<Mutex<DiskUsage>>) {
-    let memory = memory_usage.lock().unwrap();
+fn render_memory(area: Rect, buf: &mut Buffer) {
+    let memory = Mem_Usage();
     let gauge_color = calculate_gauge_color(((memory.used / memory.total) * 100.0) as u16);
     let gauge_color_swap = calculate_gauge_color(((memory.used_swap / memory.total_swap) * 100.0) as u16);
     let gauge = Gauge::default()
@@ -557,7 +554,7 @@ fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsa
     table.render(left_chunks[1], buf);
     table_swap.render(right_chunks[1], buf);
 
-    let disk_usage = disk.lock().unwrap();
+    let disk_usage = Disk_Usage();
     let disk_rows = vec![
         Row::new(vec![
             Cell::from("Device Name"),
