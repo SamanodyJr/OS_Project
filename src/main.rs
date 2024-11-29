@@ -419,6 +419,11 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
             .cloned() // Cloning Process objects to avoid holding the lock during rendering
             .collect()
     };
+
+    let column_data: Vec<bool> = {
+        let data = app.column_visibility.lock().unwrap();
+        data.clone()
+    };
     
     let max_visible_rows = (area.height as usize) - 2;
     let start_index = vertical_scroll;
@@ -436,8 +441,7 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
         } else {
             Style::default() 
         };
-        
-        Row::new(vec![
+        let cells = vec![
             Cell::from(process.pid.to_string()).style(style),        
             Cell::from(process.user.clone()).style(style),
             Cell::from(process.command.clone()).style(style),
@@ -452,7 +456,17 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
             Cell::from(process.ppid.to_string()).style(style),
             Cell::from(process.state.clone()).style(style),
             Cell::from(process.threads.to_string()).style(style),
-        ])
+        ].into_iter()
+        .enumerate()
+        .filter_map(|(i, data)| {
+            if column_data[i] {
+                Some(Cell::from(data).style(style))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+        Row::new(cells)
     }).collect();
 
     let widths = [
@@ -472,23 +486,33 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
         Constraint::Length(10),
     ];
 
+    let headerCells = vec![
+        Cell::from("PID"),
+        Cell::from("User"),
+        Cell::from("Command"),
+        Cell::from("Virtual Memory"),
+        Cell::from("RSS Memory"),
+        Cell::from("Shared Memory"),
+        Cell::from("Memory Usage"),
+        Cell::from("CPU Usage"),
+        Cell::from("Time"),
+        Cell::from("Priority"),
+        Cell::from("Nice"),
+        Cell::from("Parent PID"),
+        Cell::from("State"),
+        Cell::from("Threads"),
+    ].into_iter()
+    .enumerate()
+    .filter_map(|(i, data)| {
+        if column_data[i] {
+            Some(Cell::from(data).style(Style::default()))
+        } else {
+            None
+        }
+    })
+    .collect::<Vec<_>>();
     let table = Table::new(rows, widths)
-        .header(Row::new(vec![
-            Cell::from("PID"),
-            Cell::from("User"),
-            Cell::from("Command"),
-            Cell::from("Virtual Memory"),
-            Cell::from("RSS Memory"),
-            Cell::from("Shared Memory"),
-            Cell::from("Memory Usage"),
-            Cell::from("CPU Usage"),
-            Cell::from("Time"),
-            Cell::from("Priority"),
-            Cell::from("Nice"),
-            Cell::from("Parent PID"),
-            Cell::from("State"),
-            Cell::from("Threads"),
-        ]))
+        .header(Row::new(headerCells))
         .block(Block::default().borders(Borders::ALL).title("Processes"))
         .widths(&widths);
 
