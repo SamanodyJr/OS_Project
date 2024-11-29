@@ -67,7 +67,6 @@ fn main() {
     app_result.unwrap();
 }
 
-#[derive(Default)]
 pub struct App {
     state: AppState,
     selected_tab: SelectedTab,
@@ -77,6 +76,7 @@ pub struct App {
     pub process_data: Arc<Mutex<Vec<Process>>>,
     pub memory_usage: Arc<Mutex<MemoryUsage>>,
     pub disk_usage: Arc<Mutex<DiskUsage>>,
+    pub column_visibility: Arc<Mutex<Vec<bool>>>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
@@ -95,7 +95,27 @@ enum SelectedTab {
     Tab2,
     #[strum(to_string = "Memory/IO")]
     Tab3,
+    #[strum(to_string = "Settings")]
+    Tab4,
 
+}
+
+
+impl Default for App {
+    fn default() -> Self {
+        let column_visibility = vec![true; 14]; // Initialize with the same length as column_names
+        App {
+            state: AppState::Running,
+            selected_tab: SelectedTab::Tab1,
+            selected_row: 0,
+            is_cursed: false,
+            vertical_scroll: 0,
+            process_data: Arc::new(Mutex::new(Vec::new())),
+            memory_usage: Arc::new(Mutex::new(MemoryUsage::default())),
+            disk_usage: Arc::new(Mutex::new(DiskUsage::default())),
+            column_visibility: Arc::new(Mutex::new(column_visibility)),
+        }
+    }
 }
 
 impl App {
@@ -124,12 +144,29 @@ impl App {
                 match key.code {
                     KeyCode::Right => self.next_tab(),
                     KeyCode::Left => self.previous_tab(),
+                    KeyCode::Char(' ') if self.selected_tab == SelectedTab::Tab4 && self.is_cursed => 
+                    {
+                        self.toggle();
+                    }
                     KeyCode::Char('q') | KeyCode::Esc => self.quit(),
-                    KeyCode::Char('c') if self.selected_tab == SelectedTab::Tab1 =>self.curse(),
-                    KeyCode::Up if self.is_cursed => self.move_cursor_up(),  
-                    KeyCode::Down if self.is_cursed => self.move_cursor_down(), 
-                    KeyCode::Up => self.scroll_up(),
-                    KeyCode::Down => self.scroll_down(),
+                    KeyCode::Char('c') if self.selected_tab == SelectedTab::Tab1 || self.selected_tab == SelectedTab::Tab4 =>self.curse(),
+                    KeyCode::Up =>
+                    {
+                        if self.is_cursed {
+                            self.move_cursor_up();
+                        } 
+                        else{ 
+                            self.scroll_up();
+                        } 
+                    },  
+                    KeyCode::Down =>{
+                        if self.is_cursed {
+                            self.move_cursor_down();
+                        }
+                        else {
+                            self.scroll_down()
+                        }
+                    }, 
                     KeyCode::Char('k') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.kill(),
                     KeyCode::Char('s') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.suspend(),
                     KeyCode::Char('r') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.resume(),
@@ -173,12 +210,23 @@ impl App {
         .collect();
 
         if let Some(process) = filtered_data.get(self.selected_row) {
-            let pid = process.pid; 
-            let p_id = Pid::from_raw(pid);
+            let pid = process.pid as i16; 
+            let p_id = Pid::from_raw(pid as i32);
             if let Err(err) = kill(p_id, Signal::SIGKILL) {
                 eprintln!("Failed to send signal to process {}: {}", pid, err);
             }
         }
+    }
+    pub fn toggle(&mut self) {
+        let mut data = self.column_visibility.lock().unwrap();
+        if (data[self.selected_row] == true) {
+            data[self.selected_row] = false;
+        }
+        else {
+            data[self.selected_row] = true;
+        }
+
+
     }
     pub fn terminate(&mut self) {
         
@@ -189,8 +237,8 @@ impl App {
         .collect();
 
         if let Some(process) = filtered_data.get(self.selected_row) {
-            let pid = process.pid; 
-            let p_id = Pid::from_raw(pid);
+            let pid = process.pid as i16; 
+            let p_id = Pid::from_raw(pid as i32);
             if let Err(err) = kill(p_id, Signal::SIGTERM) {
                 eprintln!("Failed to send signal to process {}: {}", pid, err);
             }
@@ -206,7 +254,7 @@ impl App {
 
         if let Some(process) = filtered_data.get(self.selected_row) {
             let pid = process.pid; 
-            let p_id = Pid::from_raw(pid);
+            let p_id = Pid::from_raw(pid as i32);
             if let Err(err) = kill(p_id, Signal::SIGCONT) {
                 eprintln!("Failed to send signal to process {}: {}", pid, err);
             }
@@ -222,7 +270,7 @@ impl App {
 
         if let Some(process) = filtered_data.get(self.selected_row) {
             let pid = process.pid; 
-            let p_id = Pid::from_raw(pid);
+            let p_id = Pid::from_raw(pid as i32);
             if let Err(err) = kill(p_id, Signal::SIGSTOP) {
                 eprintln!("Failed to send signal to process {}: {}", pid, err);
             }
@@ -326,9 +374,10 @@ impl SelectedTab {
     fn render(self, area: Rect, buf: &mut Buffer, app: &App) {
 
         match self {
-            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed,app.process_data.clone(), app.vertical_scroll),
+            Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed, app, app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
             Self::Tab3 => render_memory(area, buf, app.memory_usage.clone(), app.disk_usage.clone()),
+            Self::Tab4 => render_settings(area, buf, app.column_visibility.clone(), app.is_cursed, app.selected_row),
         }
     }
 
@@ -344,6 +393,7 @@ impl SelectedTab {
             Self::Tab1 => tailwind::BLUE,
             Self::Tab2 => tailwind::EMERALD,
             Self::Tab3 => tailwind::INDIGO,
+            Self::Tab4 => tailwind::AMBER,
         }
     }
 
@@ -360,18 +410,20 @@ impl SelectedTab {
     }
 }
 
-fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, processes: Arc<Mutex<Vec<Process>>>, vertical_scroll: usize) {
+fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, app: &App, vertical_scroll: usize) {
     
     let filtered_data: Vec<Process> = {
-        let data = processes.lock().unwrap();
+        let data = app.process_data.lock().unwrap();
         data.iter()
             .filter(|process| process.user != "root")
             .cloned() // Cloning Process objects to avoid holding the lock during rendering
             .collect()
     };
+    
     let max_visible_rows = (area.height as usize) - 2;
     let start_index = vertical_scroll;
     let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
+    let visible_data = &filtered_data[vertical_scroll..std::cmp::min(filtered_data.len(), vertical_scroll + max_visible_rows)];
     let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
     {   
         let global_index = start_index + index;
@@ -608,4 +660,33 @@ fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsa
 
 }
 
+
+fn render_settings(area: Rect, buf: &mut Buffer, column_visibility: Arc<Mutex<Vec<bool>>>, is_cursed: bool, selected_row: usize) {
+    let column_names = vec![
+        "PID", "User", "Command", "Virtual Memory", "RSS Memory", "Shared Memory", "Memory Usage",
+        "CPU Usage", "Time", "Priority", "Nice", "Parent PID", "State", "Threads"
+    ];
+    let data = column_visibility.lock().unwrap();
+
+    let rows: Vec<Row> = column_names.iter().enumerate().map(|(i, name)| {
+        let is_selected = is_cursed && i == selected_row;
+        let visibility_marker = if data[i] { "[x]" } else { "[ ]" };
+
+        Row::new(vec![
+            Cell::from(visibility_marker),
+            Cell::from(name.to_string()),
+        ])
+        .style(if is_selected {
+            Style::default().fg(Color::Blue).bg(Color::LightGreen).bold()
+        } else {
+            Style::default()
+        })
+    }).collect();
+
+    let table = Table::new(rows, [Constraint::Length(5), Constraint::Min(20)])
+        .block(Block::default().borders(Borders::ALL).title("Settings - Toggle Columns"))
+        .widths(&[Constraint::Length(5), Constraint::Min(20)]);
+
+    table.render(area, buf);
+}
 
