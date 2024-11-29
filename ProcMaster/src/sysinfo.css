@@ -1,0 +1,28 @@
+.sysinfo-container {
+  padding: 40px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 100%; /* Increased the maximum width */
+  margin: 40px auto;
+}
+
+.sysinfo-heading {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 24px;
+}
+
+.sysinfo-chart {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+}
+
+.sysinfo-loading {
+  text-align: center;
+  color: #888;
+  font-size: 18px;
+}

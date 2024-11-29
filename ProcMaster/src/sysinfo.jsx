@@ -1,14 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import React, { useEffect, useState } from "react";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 
 const SysInfo = () => {
@@ -31,6 +32,12 @@ const SysInfo = () => {
     }
   };
 
+  const getBarColor = (value) => {
+    if (value < 20) return "yellow";
+    if (value < 40) return "orange";
+    return "red";
+  };
+
   return (
     <div>
       <h1>CPU Usage</h1>
@@ -39,7 +46,7 @@ const SysInfo = () => {
           <p>Loading...</p>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart
+            <BarChart
               data={cpuUsages}
               margin={{
                 top: 5,
@@ -50,16 +57,18 @@ const SysInfo = () => {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="core_number" />
-              <YAxis />
-              <Tooltip />
+              <YAxis domain={[0, 100]} tickFormatter={(tick) => `${tick}%`} />
+              <Tooltip formatter={(value) => `${value}%`} />
               <Legend />
-              <Line
-                type="monotone"
-                dataKey="cpu_usage"
-                stroke="#8884d8"
-                activeDot={{ r: 8 }}
-              />
-            </LineChart>
+              <Bar dataKey="cpu_usage">
+                {cpuUsages.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={getBarColor(entry.cpu_usage)}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>
