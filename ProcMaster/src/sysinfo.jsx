@@ -1,16 +1,28 @@
+import { invoke } from "@tauri-apps/api/core";
 import React, { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const SysInfo = () => {
   const [cpuUsages, setCpuUsages] = useState([]);
 
   useEffect(() => {
+    console.log("Component mounted");
     // Fetch CPU usage data when the component mounts
     fetchCpuUsages();
   }, []);
 
   const fetchCpuUsages = async () => {
     try {
+      console.log("Fetching CPU usage data...");
       const data = await invoke("cpu_resultt");
       console.log("Fetched CPU usage data:", data); // Debugging log
       setCpuUsages(data);
@@ -26,12 +38,29 @@ const SysInfo = () => {
         {cpuUsages.length === 0 ? (
           <p>Loading...</p>
         ) : (
-          cpuUsages.map((cpu, index) => (
-            <div key={index}>
-              <h2>Core {cpu.core_number}</h2>
-              <p>Usage: {cpu.cpu_usage.toFixed(1)}%</p>
-            </div>
-          ))
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart
+              data={cpuUsages}
+              margin={{
+                top: 5,
+                right: 30,
+                left: 20,
+                bottom: 5,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="core_number" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="cpu_usage"
+                stroke="#8884d8"
+                activeDot={{ r: 8 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         )}
       </div>
     </div>
