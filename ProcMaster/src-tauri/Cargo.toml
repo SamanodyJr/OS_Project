@@ -22,4 +22,16 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+procfs = "0.14.0"
+sysinfo = "0.27.4"
+libc = "0.2.164"
+nix = { version = "0.29", features = ["aio", "process", "signal", "resource", "user"] }
+ratatui = "0.29.0"
+time = "0.3.36"
+crossterm = "0.28.1"
+user = "0.1.1"
+color-eyre = "0.6"
+strum = "0.26"
+users = "0.11.0"
+tokio = {version = "1.41.1", features = ["full"] }
 

@@ -1,8 +1,16 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-
+import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import TabContext from '@mui/lab/TabContext';
+import TabList from '@mui/lab/TabList';
+import TabPanel from '@mui/lab/TabPanel';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import MemoryIcon from '@mui/icons-material/Memory';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SysInfo from "./sysinfo"; 
+import ProcessTable from "./processtable";
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
@@ -12,38 +20,44 @@ function App() {
     setGreetMsg(await invoke("greet", { name }));
   }
 
+  async function fetchProcesses() {
+    try {
+      const processes = await invoke('get_processes_info');
+      console.log("Processes: ", processes);
+      // Update your UI with the fetched process data
+    } catch (error) {
+      console.error("Failed to fetch processes:", error);
+    }
+  }
+  
+
+  const [value, setValue] = useState('1');
+
+  const handleValueChange = (event, newValue) => {
+    setValue(newValue);
+  };
+
+
   return (
     <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      <TabContext value={value}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <TabList onChange={handleValueChange} centered>
+            <Tab label="Processes" value="1" icon={<TableRowsIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
+            <Tab label="Resources" value="2" icon={<SpeedIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
+            <Tab label="Memory" value="3"  icon={<MemoryIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }}  />
+          </TabList>
+        </Box>
+          <TabPanel  value="1" style={{padding: 0, margin: 0}}>
+              <ProcessTable/>
+          </TabPanel>
+          <TabPanel value="2" style={{padding: 0, margin: 0}}>
+              <SysInfo/>
+          </TabPanel>
+          <TabPanel value="3" style={{padding: 0, margin: 0}}>
+              This is tab 3
+          </TabPanel>
+      </TabContext>
     </main>
   );
 }
