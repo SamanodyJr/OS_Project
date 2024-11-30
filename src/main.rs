@@ -71,7 +71,9 @@ pub struct App {
     state: AppState,
     selected_tab: SelectedTab,
     selected_row: usize,
+    selected_setting: usize,
     is_cursed: bool,
+    setting_cursed: bool,
     pub vertical_scroll: usize,
     pub process_data: Arc<Mutex<Vec<Process>>>,
     pub memory_usage: Arc<Mutex<MemoryUsage>>,
@@ -108,7 +110,9 @@ impl Default for App {
             state: AppState::Running,
             selected_tab: SelectedTab::Tab1,
             selected_row: 0,
+            selected_setting: 0,
             is_cursed: false,
+            setting_cursed: false,
             vertical_scroll: 0,
             process_data: Arc::new(Mutex::new(Vec::new())),
             memory_usage: Arc::new(Mutex::new(MemoryUsage::default())),
@@ -278,7 +282,12 @@ impl App {
     }
 
     pub fn curse(&mut self) {
-        self.is_cursed = !self.is_cursed;
+        if (self.selected_tab == SelectedTab::Tab1){
+            self.is_cursed = !self.is_cursed;
+        }
+        else if (self.selected_tab == SelectedTab::Tab4){
+            self.setting_cursed = !self.setting_cursed;
+        }
         
         self.selected_row = self.vertical_scroll;
     
@@ -428,7 +437,6 @@ fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed
     let max_visible_rows = (area.height as usize) - 2;
     let start_index = vertical_scroll;
     let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
-    let visible_data = &filtered_data[vertical_scroll..std::cmp::min(filtered_data.len(), vertical_scroll + max_visible_rows)];
     let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
     {   
         let global_index = start_index + index;
