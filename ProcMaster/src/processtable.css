@@ -28,3 +28,42 @@
     background-color: #f1f1f1;
   }
   
+  @media (max-width: 1024px) {
+    .process-table th,
+    .process-table td {
+      font-size: 14px; /* Reduce font size */
+      padding: 6px; /* Reduce padding */
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .process-table th,
+    .process-table td {
+      font-size: 12px; /* Further reduce font size */
+      padding: 4px; /* Further reduce padding */
+    }
+  
+    .process-table {
+      display: block;
+      overflow-x: auto; /* Scroll horizontally */
+      white-space: nowrap;
+    }
+  
+    .process-table th,
+    .process-table td {
+      text-align: left;
+      display: block;
+    }
+  
+    .process-table tr {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+  
+    .process-table td {
+      width: 100%;
+      text-align: left;
+    }
+  }
+  

@@ -5,12 +5,15 @@ import "./processtable.css"; // Optional for custom styling
 const ProcessTable = () => {
   const [processes, setProcesses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: "pid", direction: "asc" });
+  const [originalProcesses, setOriginalProcesses] = useState([]); // Track original order
 
   useEffect(() => {
     const fetchProcesses = async () => {
       try {
         const result = await invoke("get_processess");
         setProcesses(result);
+        setOriginalProcesses(result); // Store original data
         setLoading(false);
       } catch (error) {
         console.error("Error fetching processes:", error);
@@ -21,6 +24,30 @@ const ProcessTable = () => {
     fetchProcesses();
   }, []);
 
+  const sortProcesses = (key, direction) => {
+    const sortedProcesses = [...processes].sort((a, b) => {
+      if (a[key] < b[key]) return direction === "asc" ? -1 : 1;
+      if (a[key] > b[key]) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+    setProcesses(sortedProcesses);
+  };
+
+  const handleSort = (key) => {
+    let newDirection = "asc";
+    if (key === sortConfig.key) {
+      if (sortConfig.direction === "asc") {
+        newDirection = "desc";
+      } else if (sortConfig.direction === "desc") {
+        setProcesses(originalProcesses); // Reset to original state on third click
+        setSortConfig({ key: "", direction: "" }); // Reset sort config
+        return;
+      }
+    }
+    setSortConfig({ key, direction: newDirection });
+    sortProcesses(key, newDirection);
+  };
+
   if (loading) {
     return <div>Loading processes...</div>;
   }
@@ -30,20 +57,12 @@ const ProcessTable = () => {
       <table className="process-table">
         <thead>
           <tr>
-            <th>PID</th>
-            <th>User</th>
-            <th>Command</th>
-            <th>Virtual Memory (MB)</th>
-            <th>RSS Memory (MB)</th>
-            <th>Shared Memory (MB)</th>
-            <th>Memory Usage (%)</th>
-            <th>CPU Usage (%)</th>
-            <th>Time</th>
-            <th>Priority</th>
-            <th>Nice</th>
-            <th>Parent PID</th>
-            <th>State</th>
-            <th>Threads</th>
+            {["pid", "user", "command", "v_memory", "rss_memory", "shared_memory", "memory_usage", "cpu_usage", "time", "priority", "nice", "ppid", "state", "threads"].map((header) => (
+              <th key={header} onClick={() => handleSort(header)}>
+                {header.charAt(0).toUpperCase() + header.slice(1).replace(/_/g, " ")}
+                {sortConfig.key === header && (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
