@@ -16,16 +16,16 @@
   }
   
   .process-table th {
-    background-color: #f4f4f4;
+    background-color: #2a2a2a;
     font-weight: bold;
   }
   
   .process-table tr:nth-child(even) {
-    background-color: #f9f9f9;
+    background-color: #2a2a2a;
   }
   
   .process-table tr:hover {
-    background-color: #f1f1f1;
+    background-color: #396cd8;
   }
   
   @media (max-width: 1024px) {

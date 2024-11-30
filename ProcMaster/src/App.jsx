@@ -45,17 +45,14 @@ function App() {
           <TabList onChange={handleValueChange} centered>
             <Tab label="Processes" value="1" icon={<TableRowsIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
             <Tab label="Resources" value="2" icon={<SpeedIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
-            <Tab label="Memory" value="3"  icon={<MemoryIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }}  />
           </TabList>
         </Box>
-          <TabPanel  value="1" style={{padding: 0, margin: 0}}>
+          <TabPanel  value="1" style={{padding: 0, margin: 0 }}>
+            
               <ProcessTable/>
           </TabPanel>
           <TabPanel value="2" style={{padding: 0, margin: 0}}>
               <SysInfo/>
-          </TabPanel>
-          <TabPanel value="3" style={{padding: 0, margin: 0}}>
-              This is tab 3
           </TabPanel>
       </TabContext>
     </main>
