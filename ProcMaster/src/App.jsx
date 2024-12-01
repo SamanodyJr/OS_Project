@@ -40,22 +40,33 @@ function App() {
 
   return (
     <main className="container">
-      <TabContext value={value}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <TabList onChange={handleValueChange} centered>
-            <Tab label="Processes" value="1" icon={<TableRowsIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
-            <Tab label="Resources" value="2" icon={<SpeedIcon/>} iconPosition="start"  sx={{ flexGrow: 1 }} />
-          </TabList>
-        </Box>
-          <TabPanel  value="1" style={{padding: 0, margin: 0 }}>
-            
-              <ProcessTable/>
-          </TabPanel>
-          <TabPanel value="2" style={{padding: 0, margin: 0}}>
-              <SysInfo/>
-          </TabPanel>
-      </TabContext>
-    </main>
+  <TabContext value={value}>
+    <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: '#333333' }}>
+      <TabList onChange={handleValueChange} centered>
+        <Tab 
+          label="Processes" 
+          value="1" 
+          icon={<TableRowsIcon />} 
+          iconPosition="start" 
+          sx={{ flexGrow: 1, color: 'white' }} 
+        />
+        <Tab 
+          label="Resources" 
+          value="2" 
+          icon={<SpeedIcon />} 
+          iconPosition="start" 
+          sx={{ flexGrow: 1, color: 'white' }} 
+        />
+      </TabList>
+    </Box>
+    <TabPanel value="1" style={{ padding: 0, margin: 0 }}>
+      <ProcessTable />
+    </TabPanel>
+    <TabPanel value="2" style={{ padding: 0, margin: 0 }}>
+      <SysInfo />
+    </TabPanel>
+  </TabContext>
+</main>
   );
 }
 

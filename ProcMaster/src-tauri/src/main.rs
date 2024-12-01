@@ -11,8 +11,11 @@ use procfs::process::all_processes;
 use procfs::{ticks_per_second,Uptime};
 use sysinfo::{System, SystemExt, RefreshKind};
 use users::get_user_by_uid;
-use std::fmt::Write;
-use std::sync::{Arc, Mutex};
+use std::io::Write;
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::Pid;
+use std::process::Command;
+use std::process::Stdio;
 
 
 #[derive(Serialize, Clone, Default, Debug)]
@@ -268,14 +271,76 @@ fn get_processess() -> Vec<Process> {
     processes_info.iter().map(Process::from).collect()
 }
 
+#[command]
+fn kill_process(pid: i32) -> Result<(), String> {
+    send_signal(pid, Signal::SIGKILL)
+}
+
+#[command]
+fn terminate_process(pid: i32) -> Result<(), String> {
+    send_signal(pid, Signal::SIGTERM)
+}
+
+#[command]
+fn suspend_process(pid: i32) -> Result<(), String> {
+    send_signal(pid, Signal::SIGSTOP)
+}
+
+#[command]
+fn resume_process(pid: i32) -> Result<(), String> {
+    send_signal(pid, Signal::SIGCONT)
+}
+
+#[command]
+fn change_priority(pid: i32, priority: i32, password: String) -> Result<bool, String> {
+    if priority < -20 || priority > 19 {
+        return Err("Invalid priority value".to_string());
+    }
+
+    let mut child = Command::new("sudo")
+        .arg("-S") // Read password from stdin
+        .arg("renice")
+        .arg(format!("{}", priority))
+        .arg("-p")
+        .arg(format!("{}", pid))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    // Write the password to stdin
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(format!("{}\n", password).as_bytes())
+            .map_err(|e| format!("Failed to write to stdin: {}", e))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to read output: {}", e))?;
+
+    if output.status.success() {
+        Ok(true)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(stderr.into_owned())
+    }
+}
 
 
+fn send_signal(pid: i32, signal: Signal) -> Result<(), String> {
+    let pid = Pid::from_raw(pid);
+    match kill(pid, signal) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(format!("Failed to send signal to process {}: {}", pid, err)),
+    }
+}
 
-
-fn main() {
-
+fn main() 
+{
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![cpu_resultt, get_processess, Mem_Usage])
+        .invoke_handler(tauri::generate_handler![cpu_resultt, get_processess, Mem_Usage, kill_process, terminate_process, suspend_process, resume_process, change_priority])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

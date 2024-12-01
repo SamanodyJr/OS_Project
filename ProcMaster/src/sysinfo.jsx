@@ -30,7 +30,7 @@ const SysInfo = () => {
     const interval = setInterval(() => {
       fetchCpuUsages();
       fetchMemoryUsage();
-    }, 5000);
+    }, 4000);
 
     // Clean up the interval on component unmount
     return () => clearInterval(interval);
@@ -59,7 +59,7 @@ const SysInfo = () => {
   };
 
   const getBarColor = (value) => {
-    if (value < 20) return "yellow";
+    if (value < 20) return "green";
     if (value < 40) return "orange";
     return "red";
   };
@@ -77,7 +77,7 @@ const SysInfo = () => {
       ]
     : [];
 
-  const COLORS = ["#8884d8", "#82ca9d"];
+  const COLORS = ["#7C4DFF", "#2196F3"];
 
   return (
     <div>
@@ -99,7 +99,7 @@ const SysInfo = () => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="core_number" />
               <YAxis domain={[0, 100]} tickFormatter={(tick) => `${tick}%`} />
-              <Tooltip formatter={(value) => `${value}%`} />
+              <Tooltip formatter={(value) => `${value.toFixed(2)} %`} />
               <Legend />
               <Bar dataKey="cpu_usage">
                 {cpuUsages.map((entry, index) => (
@@ -113,7 +113,7 @@ const SysInfo = () => {
           </ResponsiveContainer>
         )}
       </div>
-      <h1>Memory and Swap Usage</h1>
+      <h1>Memory & Swap Usage</h1>
       <div
         style={{
           display: "flex",
@@ -134,7 +134,9 @@ const SysInfo = () => {
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
-                  label
+                  label={({ value }) => `${value.toFixed(2)} GB`}
+                  isAnimationActive={false}
+                  stroke="none"
                 >
                   {memoryData.map((entry, index) => (
                     <Cell
@@ -156,7 +158,9 @@ const SysInfo = () => {
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
-                  label
+                  label={({ value }) => `${value.toFixed(2)} GB`}
+                  isAnimationActive={false}
+                  stroke="none"
                 >
                   {swapData.map((entry, index) => (
                     <Cell

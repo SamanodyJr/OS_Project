@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-shell": "^2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "reactstrap": "^9.2.3",
     "recharts": "^2.13.3"
   },
   "devDependencies": {
