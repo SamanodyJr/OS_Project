@@ -9,6 +9,7 @@ pub use ctrl::suspend_process;
 pub use ctrl::resume_process;
 pub use ctrl::change_priority;
 use std::time::{Duration, Instant};
+use std::collections::HashMap;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
@@ -105,7 +106,8 @@ enum SelectedTab {
 
 impl Default for App {
     fn default() -> Self {
-        let column_visibility = vec![true; 14]; // Initialize with the same length as column_names
+        let mut column_visibility = vec![true; 14]; // Initialize with the same length as column_names
+        column_visibility.push(false);
         App {
             state: AppState::Running,
             selected_tab: SelectedTab::Tab1,
@@ -148,7 +150,7 @@ impl App {
                 match key.code {
                     KeyCode::Right => self.next_tab(),
                     KeyCode::Left => self.previous_tab(),
-                    KeyCode::Char(' ') if self.selected_tab == SelectedTab::Tab4 && self.is_cursed => 
+                    KeyCode::Char(' ') if self.selected_tab == SelectedTab::Tab4 && self.setting_cursed => 
                     {
                         self.toggle();
                     }
@@ -156,7 +158,7 @@ impl App {
                     KeyCode::Char('c') if self.selected_tab == SelectedTab::Tab1 || self.selected_tab == SelectedTab::Tab4 =>self.curse(),
                     KeyCode::Up =>
                     {
-                        if self.is_cursed {
+                        if self.is_cursed || self.setting_cursed {
                             self.move_cursor_up();
                         } 
                         else{ 
@@ -164,7 +166,7 @@ impl App {
                         } 
                     },  
                     KeyCode::Down =>{
-                        if self.is_cursed {
+                        if self.is_cursed || self.setting_cursed {
                             self.move_cursor_down();
                         }
                         else {
@@ -223,12 +225,7 @@ impl App {
     }
     pub fn toggle(&mut self) {
         let mut data = self.column_visibility.lock().unwrap();
-        if (data[self.selected_row] == true) {
-            data[self.selected_row] = false;
-        }
-        else {
-            data[self.selected_row] = true;
-        }
+        data[self.selected_setting] = !data[self.selected_setting];
 
 
     }
@@ -299,16 +296,26 @@ impl App {
     }
     
     pub fn move_cursor_up(&mut self) {
-        if self.selected_row > 0 {
+        if self.selected_tab == SelectedTab::Tab1 && self.selected_row > 0 {
             self.selected_row -= 1;  
+        }
+        else if self.selected_tab == SelectedTab::Tab4 && self.selected_setting > 0 {
+            self.selected_setting -= 1;
         }
     }
 
     pub fn move_cursor_down(&mut self) {
-        let data = self.process_data.lock().unwrap();
-        let process_count = data.len();
-        if self.selected_row < process_count.saturating_sub(1) {
-            self.selected_row += 1;  
+        if self.selected_tab == SelectedTab::Tab1 {
+            let data = self.process_data.lock().unwrap();
+            let process_count = data.len();
+            if self.selected_row < process_count.saturating_sub(1) {
+                self.selected_row += 1;  
+            }
+        }
+        else if self.selected_tab == SelectedTab::Tab4 {
+            if self.selected_setting < 15 {
+                self.selected_setting += 1;
+            }
         }
     }
 
@@ -366,7 +373,7 @@ fn render_footer(area: Rect, buf: &mut Buffer, selected_tab: SelectedTab, cursor
         .centered()
         .render(area, buf);
     }
-    else if selected_tab == SelectedTab::Tab1 {
+    else if selected_tab == SelectedTab::Tab1 || selected_tab == SelectedTab::Tab4 {
         
         Line::raw("← → to change tab | Press q to quit | Press c to cursor")
         .centered()
@@ -386,7 +393,7 @@ impl SelectedTab {
             Self::Tab1 => render_processes(area, buf, app.selected_row, app.is_cursed, app, app.vertical_scroll),
             Self::Tab2 => render_cpu(area, buf),
             Self::Tab3 => render_memory(area, buf, app.memory_usage.clone(), app.disk_usage.clone()),
-            Self::Tab4 => render_settings(area, buf, app.column_visibility.clone(), app.is_cursed, app.selected_row),
+            Self::Tab4 => render_settings(area, buf, app.column_visibility.clone(), app.setting_cursed, app.selected_setting),
         }
     }
 
@@ -419,112 +426,215 @@ impl SelectedTab {
     }
 }
 
-fn render_processes(area: Rect, buf: &mut Buffer, selected_row: usize, is_cursed: bool, app: &App, vertical_scroll: usize) {
-    
+fn render_processes(
+    area: Rect,
+    buf: &mut Buffer,
+    selected_row: usize,
+    is_cursed: bool,
+    app: &App,
+    vertical_scroll: usize,
+) {
     let filtered_data: Vec<Process> = {
         let data = app.process_data.lock().unwrap();
         data.iter()
             .filter(|process| process.user != "root")
-            .cloned() // Cloning Process objects to avoid holding the lock during rendering
+            .cloned()
             .collect()
     };
 
-    let column_data: Vec<bool> = {
+    let is_tree_view: bool = {
         let data = app.column_visibility.lock().unwrap();
-        data.clone()
+        data.clone()[14]
     };
+
+    // Group processes by `ppid`
+    let mut process_tree: HashMap<u32, Vec<Process>> = HashMap::new();
+    for process in &filtered_data {
+        process_tree
+            .entry(process.ppid as u32)
+            .or_insert_with(Vec::new)
+            .push(process.clone());
+    }
+
+    // Detect root processes dynamically
+    let root_processes: Vec<&Process> = filtered_data
+        .iter()
+        .filter(|process| !filtered_data.iter().any(|p| p.pid == process.ppid))
+        .collect();
+
+    // Recursive function to render the tree view
+    fn render_tree(
+        processes: &[&Process],
+        process_tree: &HashMap<u32, Vec<Process>>,
+        depth: usize,
+        current_row: &mut usize,
+        selected_row: usize,
+        vertical_scroll: usize,
+        is_cursed: bool,
+        buf: &mut Buffer,
+        area: Rect,
+    ) {
+        for process in processes {
+            if *current_row < vertical_scroll {
+                *current_row += 1; // Skip rows outside the visible area
+                continue;
+            }
+
+            let y = area.y + (*current_row - vertical_scroll) as u16;
+            if y >= area.bottom() {
+                break; // Stop rendering if we exceed the visible area
+            }
+
+            let is_selected = (*current_row - vertical_scroll) == selected_row;
+            let style = if is_selected && is_cursed {
+                Style::default().fg(Color::Blue).bg(Color::LightGreen).bold()
+            } else if is_selected {
+                Style::default().fg(Color::Blue).bold()
+            } else {
+                Style::default()
+            };
+
+            let indent = "  ".repeat(depth);
+            let process_line = format!(
+                "{}PID: {} | User: {} | Cmd: {} | CPU: {:.2}% | Mem: {:.2} MB",
+                indent, process.pid, process.user, process.command, process.cpu_usage, process.v_memory
+            );
+
+            buf.set_string(area.x, y, process_line, style);
+            *current_row += 1;
+
+            if let Some(children) = process_tree.get(&(process.pid as u32)) {
+                let children_refs: Vec<&Process> = children.iter().collect();
+                render_tree(
+                    &children_refs,
+                    process_tree,
+                    depth + 1,
+                    current_row,
+                    selected_row,
+                    vertical_scroll,
+                    is_cursed,
+                    buf,
+                    area,
+                );
+            }
+        }
+    }
+
+    // Start rendering
+    let mut current_row = 0;
+
+    if is_tree_view {
+        // Tree view rendering
+        render_tree(
+            &root_processes,
+            &process_tree,
+            0,
+            &mut current_row,
+            selected_row,
+            vertical_scroll,
+            is_cursed,
+            buf,
+            area,
+        );
+    } else {
     
-    let max_visible_rows = (area.height as usize) - 2;
-    let start_index = vertical_scroll;
-    let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
-    let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
-    {   
-        let global_index = start_index + index;
-        let is_selected = global_index == selected_row;
-        let style = if is_selected && is_cursed {
-            Style::default()
-                .fg(Color::Blue).bold()  
-                .bg(Color::LightGreen)  
-                 
-        } else {
-            Style::default() 
+        let column_data: Vec<bool> = {
+            let data = app.column_visibility.lock().unwrap();
+            data.clone()
         };
-        let cells = vec![
-            Cell::from(process.pid.to_string()).style(style),        
-            Cell::from(process.user.clone()).style(style),
-            Cell::from(process.command.clone()).style(style),
-            Cell::from(format!("{:.2} MB", process.v_memory)).style(style),
-            Cell::from(format!("{:.2} MB", process.rss_memory)).style(style),
-            Cell::from(format!("{:.2} MB", process.shared_memory)).style(style),
-            Cell::from(format!("{:.2}%", process.memory_uasge)).style(style),
-            Cell::from(format!("{:.2}%", process.cpu_usage)).style(style),
-            Cell::from(process.time.clone()).style(style),
-            Cell::from(process.priority.to_string()).style(style),
-            Cell::from(process.nice.to_string()).style(style),
-            Cell::from(process.ppid.to_string()).style(style),
-            Cell::from(process.state.clone()).style(style),
-            Cell::from(process.threads.to_string()).style(style),
+        
+        let max_visible_rows = (area.height as usize) - 2;
+        let start_index = vertical_scroll;
+        let end_index = std::cmp::min(start_index + max_visible_rows, filtered_data.len()); 
+        let rows: Vec<Row> = filtered_data[start_index..end_index].iter().enumerate().map(|(index, process)|
+        {   
+            let global_index = start_index + index;
+            let is_selected = global_index == selected_row;
+            let style = if is_selected && is_cursed {
+                Style::default()
+                    .fg(Color::Blue).bold()  
+                    .bg(Color::LightGreen)  
+                     
+            } else {
+                Style::default() 
+            };
+            let cells = vec![
+                Cell::from(process.pid.to_string()).style(style),        
+                Cell::from(process.user.clone()).style(style),
+                Cell::from(process.command.clone()).style(style),
+                Cell::from(format!("{:.2} MB", process.v_memory)).style(style),
+                Cell::from(format!("{:.2} MB", process.rss_memory)).style(style),
+                Cell::from(format!("{:.2} MB", process.shared_memory)).style(style),
+                Cell::from(format!("{:.2}%", process.memory_uasge)).style(style),
+                Cell::from(format!("{:.2}%", process.cpu_usage)).style(style),
+                Cell::from(process.time.clone()).style(style),
+                Cell::from(process.priority.to_string()).style(style),
+                Cell::from(process.nice.to_string()).style(style),
+                Cell::from(process.ppid.to_string()).style(style),
+                Cell::from(process.state.clone()).style(style),
+                Cell::from(process.threads.to_string()).style(style),
+            ].into_iter()
+            .enumerate()
+            .filter_map(|(i, data)| {
+                if column_data[i] {
+                    Some(Cell::from(data).style(style))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+            Row::new(cells)
+        }).collect();
+    
+        let widths = [
+            Constraint::Length(8),
+            Constraint::Length(10),
+            Constraint::Length(35),
+            Constraint::Length(20),
+            Constraint::Length(20),
+            Constraint::Length(15),
+            Constraint::Length(15),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(5),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(10),
+        ];
+    
+        let headerCells = vec![
+            Cell::from("PID"),
+            Cell::from("User"),
+            Cell::from("Command"),
+            Cell::from("Virtual Memory"),
+            Cell::from("RSS Memory"),
+            Cell::from("Shared Memory"),
+            Cell::from("Memory Usage"),
+            Cell::from("CPU Usage"),
+            Cell::from("Time"),
+            Cell::from("Priority"),
+            Cell::from("Nice"),
+            Cell::from("Parent PID"),
+            Cell::from("State"),
+            Cell::from("Threads"),
         ].into_iter()
         .enumerate()
         .filter_map(|(i, data)| {
             if column_data[i] {
-                Some(Cell::from(data).style(style))
+                Some(Cell::from(data).style(Style::default()))
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
-        Row::new(cells)
-    }).collect();
-
-    let widths = [
-        Constraint::Length(8),
-        Constraint::Length(10),
-        Constraint::Length(35),
-        Constraint::Length(20),
-        Constraint::Length(20),
-        Constraint::Length(15),
-        Constraint::Length(15),
-        Constraint::Length(10),
-        Constraint::Length(10),
-        Constraint::Length(10),
-        Constraint::Length(5),
-        Constraint::Length(10),
-        Constraint::Length(10),
-        Constraint::Length(10),
-    ];
-
-    let headerCells = vec![
-        Cell::from("PID"),
-        Cell::from("User"),
-        Cell::from("Command"),
-        Cell::from("Virtual Memory"),
-        Cell::from("RSS Memory"),
-        Cell::from("Shared Memory"),
-        Cell::from("Memory Usage"),
-        Cell::from("CPU Usage"),
-        Cell::from("Time"),
-        Cell::from("Priority"),
-        Cell::from("Nice"),
-        Cell::from("Parent PID"),
-        Cell::from("State"),
-        Cell::from("Threads"),
-    ].into_iter()
-    .enumerate()
-    .filter_map(|(i, data)| {
-        if column_data[i] {
-            Some(Cell::from(data).style(Style::default()))
-        } else {
-            None
-        }
-    })
-    .collect::<Vec<_>>();
-    let table = Table::new(rows, widths)
-        .header(Row::new(headerCells))
-        .block(Block::default().borders(Borders::ALL).title("Processes"))
-        .widths(&widths);
-
-    table.render(area, buf);
+        let table = Table::new(rows, widths)
+            .header(Row::new(headerCells))
+            .block(Block::default().borders(Borders::ALL).title("Processes"))
+            .widths(&widths);
+    
+        table.render(area, buf);
+    }
 }
 
 
@@ -696,7 +806,7 @@ fn render_memory(area: Rect, buf: &mut Buffer, memory_usage: Arc<Mutex<MemoryUsa
 fn render_settings(area: Rect, buf: &mut Buffer, column_visibility: Arc<Mutex<Vec<bool>>>, is_cursed: bool, selected_row: usize) {
     let column_names = vec![
         "PID", "User", "Command", "Virtual Memory", "RSS Memory", "Shared Memory", "Memory Usage",
-        "CPU Usage", "Time", "Priority", "Nice", "Parent PID", "State", "Threads"
+        "CPU Usage", "Time", "Priority", "Nice", "Parent PID", "State", "Threads", "Tree"
     ];
     let data = column_visibility.lock().unwrap();
 
