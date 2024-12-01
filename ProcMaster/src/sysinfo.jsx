@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import React, { useEffect, useState } from "react";
+import "./sysinfo.css"; 
 import {
   BarChart,
   Bar,
@@ -59,9 +60,9 @@ const SysInfo = () => {
   };
 
   const getBarColor = (value) => {
-    if (value < 20) return "green";
-    if (value < 40) return "orange";
-    return "red";
+    if (value < 20) return "#6573ed";
+    if (value < 50) return "#fcd035";
+    return "#fc5346";
   };
   const memoryData = memoryUsage
     ? [
@@ -77,7 +78,7 @@ const SysInfo = () => {
       ]
     : [];
 
-  const COLORS = ["#7C4DFF", "#2196F3"];
+  const COLORS = ["#fc5346", "#6573ed"];
 
   return (
     <div>
@@ -113,7 +114,9 @@ const SysInfo = () => {
           </ResponsiveContainer>
         )}
       </div>
-      <h1>Memory & Swap Usage</h1>
+      <div className="Cont"><h1 className="textt">Memory Usage</h1> <h1 className="textt">Swap Usage</h1>
+      </div>
+      
       <div
         style={{
           display: "flex",
@@ -153,7 +156,7 @@ const SysInfo = () => {
               <PieChart>
                 <Pie
                   data={swapData}
-                  cx="50%"
+                  cx="52%"
                   cy="50%"
                   outerRadius={100}
                   fill="#8884d8"

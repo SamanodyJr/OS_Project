@@ -42,20 +42,26 @@ function App() {
     <main className="container">
   <TabContext value={value}>
     <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: '#333333' }}>
-      <TabList onChange={handleValueChange} centered>
+      <TabList onChange={handleValueChange} centered  TabIndicatorProps={{
+        style: {
+          backgroundColor: '#6573ed', 
+        },
+      }}>
         <Tab 
           label="Processes" 
           value="1" 
           icon={<TableRowsIcon />} 
           iconPosition="start" 
-          sx={{ flexGrow: 1, color: 'white' }} 
+          sx={{ flexGrow: 1, color: '#fff', '&.Mui-selected': {
+            color: '#6573ed'}}} 
         />
         <Tab 
           label="Resources" 
           value="2" 
           icon={<SpeedIcon />} 
           iconPosition="start" 
-          sx={{ flexGrow: 1, color: 'white' }} 
+          sx={{ flexGrow: 1, color: '#fff', '&.Mui-selected': {
+            color: '#6573ed'}}}
         />
       </TabList>
     </Box>

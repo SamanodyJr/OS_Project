@@ -105,10 +105,11 @@ const ProcessTable = () => {
   };
 
   const handleRightClick = (e, process) => {
-    e.preventDefault(); // Prevent default right-click menu
-    setSelectedProcess(process); // Set the selected process
+    e.preventDefault(); 
+    setSelectedProcess(process); 
     const { clientX: mouseX, clientY: mouseY } = e;
-    setContextMenu({ x: mouseX, y: mouseY }); // Position context menu
+    const { scrollX, scrollY } = window;
+    setContextMenu({ x: mouseX + scrollX, y: mouseY + scrollY }); 
   };
 
   const handleCloseMenu = () => {

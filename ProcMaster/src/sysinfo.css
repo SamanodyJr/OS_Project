@@ -1,0 +1,8 @@
+.Cont{
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10%;
+}
+.textt{
+    margin-top: 10px;
+}

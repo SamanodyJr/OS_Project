@@ -25,7 +25,7 @@
   }
   
   .process-table tr:hover {
-    background-color: #396cd8;
+    background-color: #6573ed;
   }
   
   @media (max-width: 1024px) {
@@ -90,7 +90,7 @@
 }
 
 .custom-context-menu li:hover {
-    background-color: #444; /* Hover effect */
+    background-color: #6573ed; /* Hover effect */
 }
 
 .custom-context-menu li:active {
@@ -172,7 +172,7 @@
   background: transparent;
   margin: 0; /* Remove default margins */
   padding: 0; /* Remove padding */
-  accent-color: #007bff;
+  accent-color: #6573ed;
 }
 
 /* Slider Track */
@@ -190,7 +190,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 16px;
   width: 16px;
   border-radius: 50%;
-  background: #007bff; /* Blue color */
+  background: #6573ed; /* Blue color */
   cursor: pointer;
   margin-top: -5px; /* Aligns the thumb with the track */
   box-shadow: 0 0 0 2px #555; /* Optional outline */
@@ -210,7 +210,7 @@ input[type="range"]::-moz-range-thumb {
   height: 16px;
   width: 16px;
   border-radius: 50%;
-  background: #007bff; /* Blue color */
+  background: #6573ed; /* Blue color */
   cursor: pointer;
   border: none;
 }
@@ -239,7 +239,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .dialog-buttons button:first-child {
-  background-color: #007bff; /* Blue button for action */
+  background-color: #6573ed; /* Blue button for action */
   color: #fff;
 }
 
@@ -252,6 +252,6 @@ input[type="range"]::-moz-range-thumb {
 /* Input Focus Styles */
 .input-group input[type="password"]:focus {
   outline: none;
-  border-color: #007bff; /* Blue border on focus */
+  border-color: #6573ed; /* Blue border on focus */
 }
 
