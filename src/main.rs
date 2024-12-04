@@ -201,7 +201,7 @@ impl App {
                     KeyCode::Char('u') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.priority_up(),
                     KeyCode::Char('d') if self.is_cursed && self.selected_tab == SelectedTab::Tab1=> self.priority_down(),
                     KeyCode::Char('s') if self.selected_tab == SelectedTab::Tab1 => self.is_sortMode = !self.is_sortMode,
-                    KeyCode::Char('w') if self.is_sortMode && self.selected_tab == SelectedTab::Tab1 => self.sort = !self.sort,
+                    KeyCode::Char('w') if self.is_sortMode && self.selected_tab == SelectedTab::Tab1 => {self.sort = !self.sort; self.sorting('o');},
                     KeyCode::Char('0') if self.is_sortMode && self.selected_tab == SelectedTab::Tab1 => self.sorting('p'),
                     KeyCode::Char('1') if self.is_sortMode && self.selected_tab == SelectedTab::Tab1 => self.sorting('u'),
                     KeyCode::Char('2') if self.is_sortMode && self.selected_tab == SelectedTab::Tab1 => self.sorting('c'),
@@ -235,6 +235,7 @@ impl App {
         };
     
         match s {
+            'o' => if (whichSort % 2 == 0) {whichSort += 1;} else {whichSort -= 1;},
             'p' => data.sort_by_key(|process| {
                 if self.sort {
                     whichSort = 0;
