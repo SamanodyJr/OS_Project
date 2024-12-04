@@ -1,0 +1,257 @@
+.process-table-container {
+    margin: 20px;
+    overflow-x: auto;
+  }
+  
+  .process-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .process-table th,
+  .process-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+  }
+  
+  .process-table th {
+    background-color: #2a2a2a;
+    font-weight: bold;
+  }
+  
+  .process-table tr:nth-child(even) {
+    background-color: #2a2a2a;
+  }
+  
+  .process-table tr:hover {
+    background-color: #6573ed;
+  }
+  
+  @media (max-width: 1024px) {
+    .process-table th,
+    .process-table td {
+      font-size: 14px; /* Reduce font size */
+      padding: 6px; /* Reduce padding */
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .process-table th,
+    .process-table td {
+      font-size: 12px; /* Further reduce font size */
+      padding: 4px; /* Further reduce padding */
+    }
+  
+    .process-table {
+      display: block;
+      overflow-x: auto; /* Scroll horizontally */
+      white-space: nowrap;
+    }
+  
+    .process-table th,
+    .process-table td {
+      text-align: left;
+      display: block;
+    }
+  
+    .process-table tr {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+  
+    .process-table td {
+      width: 100%;
+      text-align: left;
+    }
+  }
+
+  .custom-context-menu {
+    position: absolute; /* Make sure it's positioned correctly */
+    background-color: #333; /* Dark background */
+    color: white; /* White text */
+    border: 1px solid #888; /* Border around the menu */
+    border-radius: 5px; /* Rounded corners */
+    padding: 10px;
+    z-index: 1000; /* Ensure it's on top of other elements */
+    min-width: 150px; /* Ensure it has a minimum width */
+}
+
+.custom-context-menu ul {
+    list-style-type: none; /* Remove default list styling */
+    padding: 0;
+    margin: 0;
+}
+
+.custom-context-menu li {
+    padding: 8px;
+    cursor: pointer;
+}
+
+.custom-context-menu li:hover {
+    background-color: #6573ed; /* Hover effect */
+}
+
+.custom-context-menu li:active {
+    background-color: #555; /* Active state */
+}
+
+/* Dialog Overlay */
+.priority-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7); /* Dark semi-transparent background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Dialog Content */
+.priority-dialog-content {
+  background-color: #1e1e1e; /* Dark background */
+  padding: 20px 30px;
+  border-radius: 8px;
+  width: 400px;
+  position: relative;
+  color: #f0f0f0; /* Light text color */
+  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Dialog Title */
+.priority-dialog-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.25em;
+  color: #ffffff; /* White text for title */
+  text-align: center; /* Center the title */
+}
+
+/* Input Group */
+.input-group {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center contents horizontally */
+  width: 100%;
+}
+
+/* Input Group Label */
+.input-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #d0d0d0; /* Slightly lighter text */
+  text-align: center; /* Center label text */
+}
+
+/* Input Fields */
+.input-group input[type="password"] {
+  width: 100%;
+  max-width: 300px; /* Optional max width */
+  padding: 8px;
+  box-sizing: border-box;
+  background-color: #2a2a2a; /* Darker input background */
+  border: 1px solid #555; /* Subtle border */
+  border-radius: 4px;
+  color: #f0f0f0; /* Light text color */
+  margin: 0; /* Remove default margins */
+}
+
+/* Slider Input */
+.input-group input[type="range"] {
+  width: 100%;
+  max-width: 300px; /* Ensure it doesn't exceed container */
+  background: transparent;
+  margin: 0; /* Remove default margins */
+  padding: 0; /* Remove padding */
+  accent-color: #6573ed;
+}
+
+/* Slider Track */
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  background: #555;
+  border-radius: 3px;
+}
+
+/* Slider Thumb */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #6573ed; /* Blue color */
+  cursor: pointer;
+  margin-top: -5px; /* Aligns the thumb with the track */
+  box-shadow: 0 0 0 2px #555; /* Optional outline */
+}
+
+/* Firefox Slider Track */
+input[type="range"]::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  cursor: pointer;
+  background: #555;
+  border-radius: 3px;
+}
+
+/* Firefox Slider Thumb */
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #6573ed; /* Blue color */
+  cursor: pointer;
+  border: none;
+}
+
+/* Error Message */
+.error-message {
+  color: #ff6b6b; /* Red color for errors */
+  margin-bottom: 15px;
+  text-align: center; /* Center the error message */
+}
+
+/* Dialog Buttons */
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%; /* Ensure buttons align properly */
+}
+
+.dialog-buttons button {
+  padding: 8px 12px;
+  margin-left: 10px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.dialog-buttons button:first-child {
+  background-color: #6573ed; /* Blue button for action */
+  color: #fff;
+}
+
+.dialog-buttons button:last-child {
+  background-color: transparent;
+  color: #f0f0f0;
+  border: 1px solid #f0f0f0;
+}
+
+/* Input Focus Styles */
+.input-group input[type="password"]:focus {
+  outline: none;
+  border-color: #6573ed; /* Blue border on focus */
+}
+
