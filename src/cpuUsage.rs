@@ -1,8 +1,9 @@
-use std::thread::sleep;
+use std::thread::{self, sleep};
 use std::time::Duration;
 use std::path::Path;
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::sync::{Arc, Mutex};
 
 
 
@@ -43,6 +44,7 @@ pub fn calculate_cpu_usage(prev: &[u64], curr: &[u64]) -> f64 {
     100.0 * (total_diff - idle_diff) as f64 / total_diff as f64
 }
 
+#[derive(Clone)]
 pub struct CpuUsage {
     pub cpu_usage: f64,
     pub core_number: i32,
@@ -62,4 +64,20 @@ pub fn cpu_result() -> Vec<CpuUsage> {
         });
     }
     cpu_usages
+}
+
+pub fn start_background_update_cpu(cpu_usages: Arc<Mutex<Vec<CpuUsage>>>) {
+    thread::spawn(move || loop {
+        
+        // Update process data every second
+
+        // Lock ProcessData and update it
+        let new_data = cpu_result();
+
+        // Lock the mutex and replace its contents
+        let mut data = cpu_usages.lock().unwrap();
+        *data = new_data;
+        thread::sleep(Duration::from_secs(1));
+        
+    });
 }
